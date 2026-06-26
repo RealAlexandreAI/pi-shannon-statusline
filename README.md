@@ -34,15 +34,14 @@ Matrix-style katakana rain on the left (toggleable). Two visual styles. No Nerd 
 ## Install
 
 ```bash
-git clone https://github.com/RealAlexandreAI/pi-shannon-statusline.git ~/Desktop/pi-shannon-statusline
-cd ~/Desktop/pi-shannon-statusline
-pi install .
+pi install npm:pi-shannon-statusline
 ```
 
-Or install as a Pi extension (once published):
+Or from source:
 
 ```bash
-pi install git:github.com/Slahser/pi-shannon-statusline
+git clone https://github.com/RealAlexandreAI/pi-shannon-statusline.git
+cd pi-shannon-statusline && pi install .
 ```
 
 ---
