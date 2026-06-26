@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="shannon-statusline.png" alt="pi-shannon-statusline preview" width="100%" />
+<img src="https://raw.githubusercontent.com/RealAlexandreAI/pi-shannon-statusline/master/shannon-statusline.png" alt="pi-shannon-statusline preview" width="100%" />
 
 # pi-shannon-statusline
 
