@@ -78,7 +78,6 @@ let sessionStartTime = 0;
 let tools: ToolRecord[] = [];
 let modelProvider = "";
 let modelId = "";
-let thinkingLevel = "";
 let cwd = "";
 
 // ═══════════════════════════════════════════════════════════════
@@ -113,7 +112,6 @@ const I_PATH = "⌘";
 const I_BRANCH = "⎇";
 const I_CLOCK = "✦";
 const I_CTX = "⊡";
-const I_THINK = "★";
 const I_IN = "↑";
 const I_DONE = "✔";
 const I_RUN = "↻";
@@ -369,15 +367,8 @@ async function buildHud(ctx: any): Promise<string[]> {
     modelStr = `${c(I_IN, modelColor)} ${c("pi", modelColor)}`;
   }
 
-  // Thinking level next to model
-  if (thinkingLevel) {
-    const thinkLabels: Record<string, string> = {
-      off: "off", minimal: "min", low: "low", medium: "med", high: "high", xhigh: "xhi", maximum: "max",
-    };
-    const label = thinkLabels[thinkingLevel] ?? thinkingLevel;
-    const thinkColor = thinkingLevel === "off" ? COMMENT : PURPLE;
-    modelStr += ` ${c(`${I_THINK}${label}`, thinkColor)}`;
-  }
+  // Thinking level removed — Pi doesn't expose real-time value in event context
+  // (getThinkingLevel() only on command ctx, ctx.model has no current level)
 
   let ctxStr = "";
   try {
@@ -511,13 +502,6 @@ export default function (pi: ExtensionAPI) {
       modelProvider = (ctx.model as any).provider ?? "";
       modelId = (ctx.model as any).id ?? "";
     }
-    // Read default thinking level from settings (thinking_level_select only fires on manual change)
-    try {
-      const settings = JSON.parse(readFileSync(join(homedir(), ".pi", "agent", "settings.json"), "utf8"));
-      thinkingLevel = settings.defaultThinkingLevel ?? settings.thinkingLevel ?? "medium";
-    } catch {
-      thinkingLevel = "medium";
-    }
     refreshHud(ctx);
   });
 
@@ -529,9 +513,8 @@ export default function (pi: ExtensionAPI) {
     refreshHud(ctx);
   });
 
-  pi.on("thinking_level_select", (event, ctx) => {
-    thinkingLevel = event.level;
-    refreshHud(ctx);
+  pi.on("thinking_level_select", (_event) => {
+    // Event fires on manual change; no real-time read API in ExtensionContext
   });
 
   pi.on("tool_call", (event, ctx) => {
