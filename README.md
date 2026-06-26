@@ -34,7 +34,7 @@ Matrix-style katakana rain on the left (toggleable). Two visual styles. No Nerd 
 ## Install
 
 ```bash
-git clone https://github.com/Slahser/pi-shannon-statusline.git ~/Desktop/pi-shannon-statusline
+git clone https://github.com/RealAlexandreAI/pi-shannon-statusline.git ~/Desktop/pi-shannon-statusline
 cd ~/Desktop/pi-shannon-statusline
 pi install .
 ```

@@ -1,10 +1,19 @@
 {
   "name": "pi-shannon-statusline",
   "version": "0.1.0",
-  "description": "Cyberpunk terminal HUD for Pi — ported from shannon-statusline for Claude Code",
+  "description": "Cyberpunk terminal HUD for Pi \u2014 ported from shannon-statusline for Claude Code",
   "license": "MIT",
   "type": "module",
   "pi": {
-    "extensions": ["./src/index.ts"]
-  }
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "repository": "github:RealAlexandreAI/pi-shannon-statusline",
+  "keywords": [
+    "pi-package",
+    "hud",
+    "statusline",
+    "cyberpunk"
+  ]
 }
