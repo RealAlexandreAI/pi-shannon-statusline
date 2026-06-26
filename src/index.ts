@@ -81,6 +81,7 @@ interface ToolRecord {
 // ═══════════════════════════════════════════════════════════════
 
 let sessionStartTime = 0;
+let turnIndex = 0;
 let tools: ToolRecord[] = [];
 let agents: AgentRecord[] = [];
 let modelProvider = "";
@@ -355,6 +356,8 @@ async function buildHud(ctx: any): Promise<string[]> {
   }
 
   if (sessionStartTime > 0) {
+    // Turn count before duration
+    if (turnIndex > 0) parts1.push(`${c("↺", CYAN)} ${c(`×${turnIndex}`, CYAN)}`);
     parts1.push(`${c(I_CLOCK, COMMENT)} ${c(fmtDuration(Date.now() - sessionStartTime), COMMENT)}`);
   }
 
@@ -518,6 +521,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     config = loadConfig();
     sessionStartTime = Date.now();
+    turnIndex = 0;
     cwd = ctx.cwd;
     tools = [];
     if (ctx.model) {
@@ -537,6 +541,11 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("thinking_level_select", (_event) => {
     // Event fires on manual change; no real-time read API in ExtensionContext
+  });
+
+  pi.on("turn_start", (_event, ctx) => {
+    turnIndex = (_event as any).turnIndex ?? (turnIndex + 1);
+    refreshHud(ctx);
   });
 
   pi.on("tool_call", (event, ctx) => {
