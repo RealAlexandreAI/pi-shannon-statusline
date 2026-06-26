@@ -357,7 +357,7 @@ async function buildHud(ctx: any): Promise<string[]> {
 
   if (sessionStartTime > 0) {
     // Turn count before duration
-    if (turnIndex > 0) parts1.push(`${c(`↺ loop`, GREEN)} ${c(`×${turnIndex}`, FG)}`);
+    if (turnIndex > 0) parts1.push(`${c(`↺ loop`, PURPLE)} ${c(`×${turnIndex}`, FG)}`);
     parts1.push(`${c(I_CLOCK, COMMENT)} ${c(fmtDuration(Date.now() - sessionStartTime), COMMENT)}`);
   }
 
