@@ -422,7 +422,7 @@ async function buildHud(ctx: any): Promise<string[]> {
 
 function refreshHud(ctx: any) {
   buildHud(ctx).then(lines => {
-    if (lines.length > 0) ctx.ui.setWidget("shannon-hud", lines);
+    if (lines.length > 0) ctx.ui.setWidget("shannon-hud", lines, { placement: "belowEditor" });
   }).catch(() => {});
 }
 
@@ -479,6 +479,9 @@ export default function (pi: ExtensionAPI) {
     sessionStartTime = Date.now();
     cwd = ctx.cwd;
     tools = [];
+    // Pick up initial model on startup
+    if (ctx.model?.id) currentModel = ctx.model.id;
+    refreshHud(ctx);
   });
 
   pi.on("model_select", (event, ctx) => {
