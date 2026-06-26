@@ -435,12 +435,12 @@ async function buildHud(ctx: any): Promise<string[]> {
   const agentCompleted = agents.filter(a => a.status === "completed");
   if (agentRunning.length > 0 || agentCompleted.length > 0) {
     lines.push(`${COMMENT}${"─".repeat(67)}${R}`);
+    const parts: string[] = [];
     for (const a of agentRunning) {
-      lines.push(`${c(I_RUN, YELLOW)} ${c("agent", PURPLE)} ${c(`(${fmtDuration(Date.now() - a.startTime)})`, COMMENT)}`);
+      parts.push(`${c(I_RUN, YELLOW)} ${c("agent", PURPLE)} ${c(`(${fmtDuration(Date.now() - a.startTime)})`, COMMENT)}`);
     }
-    if (agentCompleted.length > 0) {
-      lines.push(`${GREEN} ${c("agent", PURPLE)} ${c(`×${agentCompleted.length}`, COMMENT)}`);
-    }
+    if (agentCompleted.length > 0) parts.push(`${GREEN} ${c(`×${agentCompleted.length}`, COMMENT)}`);
+    lines.push(parts.join(` ${sep} `));
   }
 
   // ── Matrix rain (if enabled) ──
