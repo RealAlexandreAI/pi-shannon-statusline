@@ -17,7 +17,7 @@ Ported from [shannon-statusline](https://github.com/RealAlexandreAI/shannon-stat
 A live HUD rendered below every Pi response:
 
 ```
-⌘ ~/D/project  │  ⎇ main* ↑2 !3 +1  │  ✦ 12m
+⌘ ~/D/project  │  ⎇ main* ↑2 !3 +1  │  ↺ loop ×12  │  ✦ 12m
 ↑ deepseek / deepseek-v4-pro  │  ⊡ ████████░░░░ 65% (200k)  │  ↑ 36k
 ※ ×3 AGENTS.md  │  ⊕ ×4 MCPs  │  ×5 skills
 ─────────────────────────────────────────────────────────────
