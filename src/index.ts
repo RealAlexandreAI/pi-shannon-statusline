@@ -439,7 +439,9 @@ async function buildHud(ctx: any): Promise<string[]> {
     for (const a of agentRunning) {
       parts.push(`${c(I_RUN, YELLOW)} ${c("agent", PURPLE)} ${c(`(${fmtDuration(Date.now() - a.startTime)})`, COMMENT)}`);
     }
-    if (agentCompleted.length > 0) parts.push(`${GREEN} ${c(`×${agentCompleted.length}`, COMMENT)}`);
+    if (agentCompleted.length > 0) {
+      parts.push(`${c("agent", PURPLE)} ${GREEN} ${c(`×${agentCompleted.length}`, COMMENT)}`);
+    }
     lines.push(parts.join(` ${sep} `));
   }
 
