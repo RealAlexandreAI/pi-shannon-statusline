@@ -507,23 +507,31 @@ export default function (pi: ExtensionAPI) {
     sessionStartTime = Date.now();
     cwd = ctx.cwd;
     tools = [];
-    // Pi model object: provider + id are separate fields
     if (ctx.model) {
       modelProvider = (ctx.model as any).provider ?? "";
       modelId = (ctx.model as any).id ?? "";
     }
+    // Read default thinking level from settings (thinking_level_select only fires on manual change)
+    try {
+      const settings = JSON.parse(readFileSync(join(homedir(), ".pi", "agent", "settings.json"), "utf8"));
+      thinkingLevel = settings.defaultThinkingLevel ?? settings.thinkingLevel ?? "medium";
+    } catch {
+      thinkingLevel = "medium";
+    }
     refreshHud(ctx);
   });
 
-  pi.on("model_select", (event) => {
+  pi.on("model_select", (event, ctx) => {
     if (event.model) {
       modelProvider = (event.model as any).provider ?? "";
       modelId = (event.model as any).id ?? "";
     }
+    refreshHud(ctx);
   });
 
-  pi.on("thinking_level_select", (event) => {
+  pi.on("thinking_level_select", (event, ctx) => {
     thinkingLevel = event.level;
+    refreshHud(ctx);
   });
 
   pi.on("tool_call", (event, ctx) => {
