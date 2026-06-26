@@ -24,7 +24,7 @@ const execFileAsync = promisify(execFile);
 
 const CONFIG_PATH = join(homedir(), ".pi", "shannon-statusline.json");
 
-type HUDStyle = "cyberpunk" | "powerline" | "minimal";
+type HUDStyle = "cyberpunk" | "powerline";
 
 interface ShannonConfig {
   style: HUDStyle;
@@ -420,13 +420,8 @@ async function buildHud(ctx: any): Promise<string[]> {
     if (count > 0) toolLineParts.push(`${GREEN} ${c(name, FG)}${count > 1 ? ` ${c(`×${count}`, COMMENT)}` : ""}`);
   }
   if (toolLineParts.length > 0) {
-    if (config.style === "minimal") {
-      lines.push(`${dim("─".repeat(40))}`);
-      lines.push(`${c(`${I_DONE} ${completed.length} tools`, COMMENT)}`);
-    } else {
-      lines.push(`${COMMENT}${"─".repeat(50)}${R}`);
-      lines.push(toolLineParts.join(`  ${sep}  `));
-    }
+    lines.push(`${COMMENT}${"─".repeat(50)}${R}`);
+    lines.push(toolLineParts.join(`  ${sep}  `));
   }
 
   // ── Running tools ──
@@ -471,14 +466,14 @@ export default function (pi: ExtensionAPI) {
 
       if (a.startsWith("style")) {
         const styleArg = a.replace("style", "").trim();
-        const validStyles: HUDStyle[] = ["cyberpunk", "powerline", "minimal"];
+        const validStyles: HUDStyle[] = ["cyberpunk", "powerline"];
         if (validStyles.includes(styleArg as HUDStyle)) {
           config.style = styleArg as HUDStyle;
           saveConfig(config);
           refreshHud(ctx);
           ctx.ui.notify(`Shannon HUD → ${styleArg}`, "info");
         } else {
-          ctx.ui.notify(`Unknown style: "${styleArg}". Use: cyberpunk | powerline | minimal`, "warn");
+          ctx.ui.notify(`Unknown style: "${styleArg}". Use: cyberpunk | powerline`, "warn");
         }
       } else if (a.startsWith("rain")) {
         const rainArg = a.replace("rain", "").trim();

@@ -23,24 +23,23 @@ pi install .
 ## Commands
 
 ```
-/shannon-statusline style cyberpunk   # Monokai Pro palette, matrix rain
+/shannon-statusline style cyberpunk   # Default: Monokai Pro palette + matrix rain
 /shannon-statusline style powerline   # Bright separator bars, muted accents
-/shannon-statusline style minimal     # Reduced output, no tool breakdown
 /shannon-statusline rain on           # Enable matrix rain
 /shannon-statusline rain off          # Disable matrix rain
-/shannon-statusline                   # Toggle rain
+/shannon-statusline                   # Toggle rain (convenience)
 ```
 
 Config saved to `~/.pi/shannon-statusline.json`.
 
 ## Features
 
-- **Project line** — cwd, git branch/dirty, ahead/behind, file changes
-- **Model line** — provider/model (two-level), thinking level, context bar, token count
+- **Project line** — cwd (fish-style), git branch/dirty, ahead/behind, file changes
+- **Model line** — provider/model, thinking level, context bar, token count
 - **Config line** — AGENTS.md count, rules count, MCP count, skills count
 - **Tool activity** — completed tool counts, running tools with elapsed time
-- **Matrix rain** — animated katakana rain (toggleable)
-- **3 visual styles** — cyberpunk, powerline, minimal
+- **Matrix rain** — 6-column animated katakana rain (toggleable)
+- **2 visual styles** — cyberpunk, powerline
 
 ## Pi-specific advantages
 
