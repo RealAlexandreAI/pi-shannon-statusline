@@ -76,7 +76,8 @@ interface ToolRecord {
 
 let sessionStartTime = 0;
 let tools: ToolRecord[] = [];
-let currentModel = "";
+let modelProvider = "";
+let modelId = "";
 let thinkingLevel = "";
 let cwd = "";
 
@@ -100,11 +101,9 @@ const PURPLE = "\x1b[38;5;141m";
 const YELLOW = "\x1b[38;5;221m";
 
 // Powerline colors
-const PL_BG1 = "\x1b[48;5;235m";
-const PL_BG2 = "\x1b[48;5;237m";
-const PL_SEP = "\x1b[38;5;240m";
 const PL_BRIGHT = "\x1b[38;5;231m";
 const PL_DIM = "\x1b[38;5;244m";
+const PL_SEP = "\x1b[38;5;240m";
 
 function c(text: string, color: string) { return `${color}${text}${R}`; }
 function dim(text: string) { return `${D}${text}${R}`; }
@@ -120,6 +119,56 @@ const I_DONE = "✔";
 const I_RUN = "↻";
 const I_CLAUDE = "※";
 const I_MCP = "⊕";
+
+// ═══════════════════════════════════════════════════════════════
+// Fish-style path shortening (from original shannon-statusline)
+// ═══════════════════════════════════════════════════════════════
+
+function abbreviateSegment(segment: string): string {
+  if (segment.length <= 1) return segment;
+  const extra = segment.match(/[-.](.)/);
+  return extra ? `${segment[0]}${extra[0]}` : segment[0];
+}
+
+function truncateTailSegment(segment: string, maxLen: number): string {
+  if (segment.length <= maxLen) return segment;
+  if (maxLen <= 1) return "…";
+  const extStart = segment.lastIndexOf(".");
+  const hasExt = extStart > 0 && extStart < segment.length - 1;
+  if (!hasExt) return `…${segment.slice(-(maxLen - 1))}`;
+  const ext = segment.slice(extStart);
+  const base = segment.slice(0, extStart);
+  const budget = maxLen - ext.length - 1;
+  if (budget <= 0) return `…${ext.slice(-(maxLen - 1))}`;
+  return `…${base.slice(-budget)}${ext}`;
+}
+
+function shortenDisplayPath(fullPath: string, home: string, maxLen: number): string {
+  if (!fullPath) return "";
+  let display = fullPath;
+  if (home && fullPath === home) return "~";
+  if (home && fullPath.startsWith(home + "/")) {
+    display = "~" + fullPath.slice(home.length);
+  }
+
+  const prefix = display.startsWith("~") ? "~" : display.startsWith("/") ? "/" : "";
+  const rawParts = display.split("/").filter(Boolean);
+  const parts = prefix === "~" ? rawParts.slice(1) : rawParts;
+  if (parts.length <= 1) return display;
+
+  const tail = parts.slice(-1);
+  const head = parts.slice(0, -1).map(abbreviateSegment);
+  let shortened = [...head, ...tail].join("/");
+  if (prefix) shortened = prefix + "/" + shortened;
+
+  if (shortened.length <= maxLen) return shortened;
+
+  const ellipsis = prefix + "/…/" + tail.join("/");
+  if (ellipsis.length <= maxLen) return ellipsis;
+
+  const budget = Math.max(1, maxLen - (prefix ? prefix.length + 4 : 3));
+  return `${prefix ? prefix + "/" : ""}…/${truncateTailSegment(tail[0]!, budget)}`;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Context bar
@@ -170,41 +219,17 @@ function fmtDuration(ms: number): string {
   return `${h}h ${m % 60}m`;
 }
 
-function shortenPath(p: string, maxLen: number): string {
-  if (p.length <= maxLen) return p;
-  const parts = p.split("/");
-  if (parts.length <= 2) return p;
-  let result = `${parts[0]}/...`;
-  for (let i = 1; i < parts.length; i++) {
-    const candidate = `${result}/${parts[i]}`;
-    if (candidate.length > maxLen) { result += "/..."; break; }
-    result = candidate;
-  }
-  return result;
-}
-
 // ═══════════════════════════════════════════════════════════════
-// Model name — parse provider/model from id (may be "deepseek/deepseek-v4-pro" or just "deepseek-v4-pro")
-// ═══════════════════════════════════════════════════════════════
-
-function parseModel(raw: string): { provider: string; model: string } {
-  if (!raw) return { provider: "", model: "pi" };
-  const slash = raw.indexOf("/");
-  if (slash > 0) {
-    return { provider: raw.slice(0, slash), model: raw.slice(slash + 1) };
-  }
-  return { provider: "", model: raw };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Matrix rain
+// Matrix rain (6 columns like original)
 // ═══════════════════════════════════════════════════════════════
 
 const RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
-const RAIN_COLS = 4;
+const RAIN_COLS = 6;
+const RAIN_SPEED_MS = 900;
+const RAIN_COL_OFFSET_MS = 280;
 
 function rainCell(row: number, col: number, now: number, total: number): string {
-  const colPhase = ((now + col * 280) / 900) % total;
+  const colPhase = ((now + col * RAIN_COL_OFFSET_MS) / RAIN_SPEED_MS) % total;
   const headRow = Math.floor(colPhase);
   const dist = (row - headRow + total) % total;
   const ch = RAIN_CHARS[Math.floor(now / 350 + row * 7 + col * 13) % RAIN_CHARS.length] ?? " ";
@@ -213,7 +238,9 @@ function rainCell(row: number, col: number, now: number, total: number): string 
   if (dist === 1) return `${rgb(57, 255, 20)}${ch}${R}`;
   if (dist === 2) return `${rgb(0, 200, 0)}${ch}${R}`;
   if (dist === 3) return `${rgb(0, 160, 0)}${ch}${R}`;
+  if (dist === 4) return `${rgb(0, 100, 0)}${ch}${R}`;
   if (dist === total - 1) return `${rgb(20, 20, 20)}${ch}${R}`;
+  if (dist === total - 2) return `${rgb(0, 0, 0)}${ch}${R}`;
   return `${rgb(8, 8, 8)}${ch}${R}`;
 }
 
@@ -297,12 +324,14 @@ function countConfigs(dir: string) {
 async function buildHud(ctx: any): Promise<string[]> {
   const lines: string[] = [];
   const dir = cwd;
-  const parsedModel = parseModel(currentModel);
   const sep = config.style === "powerline" ? ` ${PL_SEP}│${R} ` : ` ${COMMENT}│${R} `;
 
   // ── Line 1: Project + Git + Duration ──
   const parts1: string[] = [];
-  if (dir) parts1.push(`${c(I_PATH, ORANGE)} ${c(shortenPath(dir, 30), ORANGE)}`);
+  if (dir) {
+    const home = homedir();
+    parts1.push(`${c(I_PATH, ORANGE)} ${c(shortenDisplayPath(dir, home, 30), ORANGE)}`);
+  }
 
   const git = await getGit(dir);
   if (git) {
@@ -326,14 +355,18 @@ async function buildHud(ctx: any): Promise<string[]> {
 
   lines.push(parts1.join(` ${sep} `));
 
-  // ── Line 2: Model + Thinking level + Context + Tokens ──
+  // ── Line 2: Model (provider/id) + Thinking level + Context + Tokens ──
   const modelColor = config.style === "powerline" ? PL_BRIGHT : CYAN;
   const providerColor = config.style === "powerline" ? PL_DIM : COMMENT;
   let modelStr: string;
-  if (parsedModel.provider) {
-    modelStr = `${c(I_IN, modelColor)} ${c(parsedModel.provider, providerColor)}/${c(parsedModel.model, modelColor)}`;
+  if (modelProvider && modelId) {
+    modelStr = `${c(I_IN, modelColor)} ${c(modelProvider, providerColor)}${dim("/")}${c(modelId, modelColor)}`;
+  } else if (modelId) {
+    modelStr = `${c(I_IN, modelColor)} ${c(modelId, modelColor)}`;
+  } else if (modelProvider) {
+    modelStr = `${c(I_IN, modelColor)} ${c(modelProvider, modelColor)}`;
   } else {
-    modelStr = `${c(I_IN, modelColor)} ${c(parsedModel.model, modelColor)}`;
+    modelStr = `${c(I_IN, modelColor)} ${c("pi", modelColor)}`;
   }
 
   // Thinking level next to model
@@ -354,7 +387,7 @@ async function buildHud(ctx: any): Promise<string[]> {
       const bar = ctxBar(pct, 10);
       const win = usage.contextWindow ?? 0;
       const winLabel = win >= 1_000_000 ? `${(win / 1_000_000).toFixed(1)}M` : win >= 1000 ? `${Math.round(win / 1000)}k` : "";
-      ctxStr = `${c(I_CTX, CYAN)} ${bar} ${c(`${pct}%`, ctxPctColor(pct))}`;
+      ctxStr = `${c(I_CTX, CYAN)} ${bar} ${c(`${pct.toFixed(1)}%`, ctxPctColor(pct))}`;
       if (winLabel) ctxStr += ` ${dim(`(${winLabel})`)}`;
 
       const totalTokens = usage.tokens ?? 0;
@@ -388,7 +421,6 @@ async function buildHud(ctx: any): Promise<string[]> {
   }
   if (toolLineParts.length > 0) {
     if (config.style === "minimal") {
-      // Just show total tool count
       lines.push(`${dim("─".repeat(40))}`);
       lines.push(`${c(`${I_DONE} ${completed.length} tools`, COMMENT)}`);
     } else {
@@ -401,7 +433,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   const running = tools.filter(t => t.status === "running");
   for (const t of running.slice(-2)) {
     const elapsed = fmtDuration(Date.now() - t.startTime);
-    const target = t.target ? `: ${shortenPath(t.target, 25)}` : "";
+    const target = t.target ? `: ${shortenDisplayPath(t.target, homedir(), 22)}` : "";
     lines.push(`${c(I_RUN, YELLOW)} ${c(t.name, CYAN)}${target} ${c(`(${elapsed})`, COMMENT)}`);
   }
 
@@ -464,7 +496,6 @@ export default function (pi: ExtensionAPI) {
           ctx.ui.notify(`Use: /shannon-statusline rain on|off`, "warn");
         }
       } else {
-        // Toggle rain
         config.rain = !config.rain;
         saveConfig(config);
         refreshHud(ctx);
@@ -479,19 +510,23 @@ export default function (pi: ExtensionAPI) {
     sessionStartTime = Date.now();
     cwd = ctx.cwd;
     tools = [];
-    // Pick up initial model on startup
-    if (ctx.model?.id) currentModel = ctx.model.id;
+    // Pi model object: provider + id are separate fields
+    if (ctx.model) {
+      modelProvider = (ctx.model as any).provider ?? "";
+      modelId = (ctx.model as any).id ?? "";
+    }
     refreshHud(ctx);
   });
 
-  pi.on("model_select", (event, ctx) => {
-    currentModel = event.model?.id ?? "";
-    refreshHud(ctx);
+  pi.on("model_select", (event) => {
+    if (event.model) {
+      modelProvider = (event.model as any).provider ?? "";
+      modelId = (event.model as any).id ?? "";
+    }
   });
 
-  pi.on("thinking_level_select", (event, ctx) => {
+  pi.on("thinking_level_select", (event) => {
     thinkingLevel = event.level;
-    refreshHud(ctx);
   });
 
   pi.on("tool_call", (event, ctx) => {
@@ -518,9 +553,4 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("turn_end", (_event, ctx) => refreshHud(ctx));
   pi.on("agent_end", (_event, ctx) => refreshHud(ctx));
-
-  // Periodic rain animation
-  setInterval(() => {
-    // ctx not available here; next event will re-render with fresh rain timestamps
-  }, 900);
 }
