@@ -483,7 +483,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("model_select", (event, ctx) => {
     currentModel = event.model?.id ?? "";
-    thinkingLevel = ctx.model?.thinkingLevel ?? "";
     refreshHud(ctx);
   });
 
