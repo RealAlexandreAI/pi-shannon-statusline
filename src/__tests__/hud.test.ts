@@ -51,7 +51,7 @@ interface AgentRecord {
 // Tool count rendering (extracted from buildHud)
 // ═══════════════════════════════════════════════════════════════
 
-function renderToolCounts(tools: ToolRecord[], style: "cyberpunk" | "powerline"): string[] {
+function renderToolCounts(tools: ToolRecord[]): string[] {
   const sep = `${COMMENT}│${R}`;
   const completed = tools.filter(t => t.status === "completed");
   const toolCounts = new Map<string, number>();
@@ -77,7 +77,7 @@ function renderToolCounts(tools: ToolRecord[], style: "cyberpunk" | "powerline")
   return [`${COMMENT}${"─".repeat(67)}${R}`, rebuilt.join(` ${sep} `)];
 }
 
-function renderAgentActivity(agents: AgentRecord[], style: "cyberpunk" | "powerline"): string[] {
+function renderAgentActivity(agents: AgentRecord[]): string[] {
   const sep = `${COMMENT}│${R}`;
   const agentRunning = agents.filter(a => a.status === "running");
   const agentCompleted = agents.filter(a => a.status === "completed");
@@ -121,7 +121,7 @@ describe("fmtDuration", () => {
 
 describe("renderToolCounts", () => {
   it("returns empty for no completed tools", () => {
-    assert.deepStrictEqual(renderToolCounts([], "cyberpunk"), []);
+    assert.deepStrictEqual(renderToolCounts([]), []);
   });
 
   it("shows single tool without ×1", () => {
@@ -179,7 +179,7 @@ describe("renderToolCounts", () => {
   });
 
   it("separator is 67 chars", () => {
-    const lines = renderToolCounts([{ name: "read", status: "completed", startTime: 0 }], "cyberpunk");
+    const lines = renderToolCounts([{ name: "read", status: "completed", startTime: 0 }]);
     const sep = stripANSI(lines[0]!);
     assert.equal(sep.length, 67, `separator should be 67 chars, got ${sep.length}: "${sep}"`);
   });
@@ -187,7 +187,7 @@ describe("renderToolCounts", () => {
 
 describe("renderAgentActivity", () => {
   it("returns empty for no agents", () => {
-    assert.deepStrictEqual(renderAgentActivity([], "cyberpunk"), []);
+    assert.deepStrictEqual(renderAgentActivity([]), []);
   });
 
   it("shows running agent with timer", () => {
@@ -235,7 +235,7 @@ describe("renderAgentActivity", () => {
   });
 
   it("separator is 67 chars for agent section", () => {
-    const lines = renderAgentActivity([{ status: "completed", startTime: 0 }], "cyberpunk");
+    const lines = renderAgentActivity([{ status: "completed", startTime: 0 }]);
     const sep = stripANSI(lines[0]!);
     assert.equal(sep.length, 67, `separator should be 67 chars, got ${sep.length}`);
   });

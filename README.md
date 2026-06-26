@@ -14,7 +14,7 @@ Ported from [shannon-statusline](https://github.com/RealAlexandreAI/shannon-stat
 
 ## What you get
 
-A live HUD rendered below every Pi response:
+A live cyberpunk HUD rendered below every Pi response:
 
 ```
 ⌘ ~/D/project  │  ⎇ main* ↑2 !3 +1  │  ↺ loop ×12  │  ✦ 12m
@@ -27,7 +27,7 @@ A live HUD rendered below every Pi response:
 ↻ agent (3s)  │  ✔ agent ×2
 ```
 
-Matrix-style katakana rain on the left (toggleable). Two visual styles. No Nerd Font needed.
+Matrix katakana rain on the left. Monokai Pro palette. No config, no commands — plug and play.
 
 ---
 
@@ -46,31 +46,17 @@ cd pi-shannon-statusline && pi install .
 
 ---
 
-## Commands
-
-```
-/shannon-statusline                 # Show help
-/shannon-statusline style cyberpunk # Monokai Pro palette + matrix rain (default)
-/shannon-statusline style powerline # Bright separator bars, muted accents
-/shannon-statusline rain on         # Enable matrix rain
-/shannon-statusline rain off        # Disable matrix rain
-```
-
-Config persisted to `~/.pi/shannon-statusline.json`.
-
----
-
 ## Features
 
 | Section | Content |
 |---|---|
-| **Project + Git** | CWD (fish-style abbreviation), branch, dirty, ahead/behind, modified/added/deleted/untracked |
+| **Project + Git** | CWD (fish-style abbreviation), branch, dirty, ahead/behind, file changes |
+| **Turn count** | `↺ loop ×N` between git and duration |
 | **Model + Context** | Provider / model name, context bar with percentage, token count |
 | **Config counts** | AGENTS.md ×N, rules ×N, MCPs ×N, skills ×N |
-| **Tool activity** | Completed tool counts (read/edit/write/bash/grep/find/ls), running tools with elapsed time |
-| **Agent activity** | Running agent timer, completed agent count (Pi core events) |
-| **Matrix rain** | 6-column animated katakana rain (toggleable via `/shannon-statusline rain on|off`) |
-| **2 styles** | `cyberpunk` (Monokai Pro), `powerline` (bright separators) |
+| **Tool activity** | Completed tool counts, running tools with elapsed time |
+| **Agent activity** | Running agent timer, completed agent count |
+| **Matrix rain** | 6-column animated katakana rain, always on |
 
 ## Pi-native advantages
 
@@ -79,15 +65,13 @@ Config persisted to `~/.pi/shannon-statusline.json`.
 - **Session-aware** — resets on `/new`, `/resume`, `/fork`
 - **Model auto-detection** — updates on `model_select` event
 - **Tool/agent tracking** — hooks `tool_call`, `tool_result`, `agent_start`, `agent_end`
-- **Zero config** — works out of the box, style/rain toggleable via slash command
+- **Zero config** — install and go
 
 ## Testing
 
 ```bash
 node --test src/__tests__/hud.test.ts
 ```
-
-Covers: tool count rendering, agent activity display, separator formatting, formatters.
 
 ## License
 

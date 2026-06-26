@@ -1,51 +1,15 @@
 /**
  * pi-shannon-statusline — Cyberpunk HUD for Pi
  * Ported from shannon-statusline (Claude Code).
- *
- * Commands:
- *   /shannon-statusline style <cyberpunk|powerline|minimal>
- *   /shannon-statusline rain <on|off>
- *
- * Config: ~/.pi/shannon-statusline.json
- *   { "style": "cyberpunk", "rain": true }
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readdirSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { homedir } from "node:os";
 
 const execFileAsync = promisify(execFile);
-
-// ═══════════════════════════════════════════════════════════════
-// Config
-// ═══════════════════════════════════════════════════════════════
-
-const CONFIG_PATH = join(homedir(), ".pi", "shannon-statusline.json");
-
-type HUDStyle = "cyberpunk" | "powerline";
-
-interface ShannonConfig {
-  style: HUDStyle;
-  rain: boolean;
-}
-
-function loadConfig(): ShannonConfig {
-  try {
-    const raw = readFileSync(CONFIG_PATH, "utf8");
-    return JSON.parse(raw) as ShannonConfig;
-  } catch {
-    return { style: "cyberpunk", rain: true };
-  }
-}
-
-function saveConfig(cfg: ShannonConfig): void {
-  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), "utf8");
-}
-
-let config = loadConfig();
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -106,11 +70,6 @@ const ORANGE = "\x1b[38;5;208m";
 const CYAN = "\x1b[38;5;123m";
 const PURPLE = "\x1b[38;5;141m";
 const YELLOW = "\x1b[38;5;221m";
-
-// Powerline colors
-const PL_BRIGHT = "\x1b[38;5;231m";
-const PL_DIM = "\x1b[38;5;244m";
-const PL_SEP = "\x1b[38;5;240m";
 
 function c(text: string, color: string) { return `${color}${text}${R}`; }
 function dim(text: string) { return `${D}${text}${R}`; }
@@ -251,7 +210,7 @@ function rainCell(row: number, col: number, now: number, total: number): string 
 }
 
 function makeRain(row: number, total: number): string {
-  if (!config.rain) return "";
+  // rain always on, no early return
   const now = Date.now();
   const cells: string[] = [];
   for (let c = 0; c < RAIN_COLS; c++) cells.push(rainCell(row, c, now, total));
@@ -330,7 +289,7 @@ function countConfigs(dir: string) {
 async function buildHud(ctx: any): Promise<string[]> {
   const lines: string[] = [];
   const dir = cwd;
-  const sep = config.style === "powerline" ? `${PL_SEP}│${R}` : `${COMMENT}│${R}`;
+  const sep = `${COMMENT}│${R}`;
 
   // ── Line 1: Project + Git + Duration ──
   const parts1: string[] = [];
@@ -342,7 +301,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   const git = await getGit(dir);
   if (git) {
     const dirty = git.isDirty ? "*" : "";
-    const branchColor = config.style === "powerline" ? PL_BRIGHT : CYAN;
+    const branchColor = CYAN;
     let gitStr = `${c(I_BRANCH, branchColor)} ${c(`${git.branch}${dirty}`, branchColor)}`;
     const details: string[] = [];
     if (git.ahead > 0) details.push(c(`↑${git.ahead}`, GREEN));
@@ -364,8 +323,8 @@ async function buildHud(ctx: any): Promise<string[]> {
   lines.push(parts1.join(` ${sep} `));
 
   // ── Line 2: Model (provider/id) + Thinking level + Context + Tokens ──
-  const modelColor = config.style === "powerline" ? PL_BRIGHT : CYAN;
-  const providerColor = config.style === "powerline" ? PL_DIM : COMMENT;
+  const modelColor = CYAN;
+  const providerColor = COMMENT;
   let modelStr: string;
   if (modelProvider && modelId) {
     modelStr = `${c(I_IN, modelColor)} ${c(modelProvider, providerColor)}${dim("/")}${c(modelId, modelColor)}`;
@@ -404,9 +363,9 @@ async function buildHud(ctx: any): Promise<string[]> {
   // ── Line 3: Config counts ──
   const configs = countConfigs(dir);
   const cfgParts: string[] = [];
-  if (configs.claudeMd > 0) cfgParts.push(`${c(I_CLAUDE, config.style === "powerline" ? PL_BRIGHT : ORANGE)} ${c(`×${configs.claudeMd}`, config.style === "powerline" ? PL_BRIGHT : ORANGE)} ${dim("AGENTS.md")}`);
+  if (configs.claudeMd > 0) cfgParts.push(`${c(I_CLAUDE, ORANGE)} ${c(`×${configs.claudeMd}`, ORANGE)} ${dim("AGENTS.md")}`);
   if (configs.rules > 0) cfgParts.push(`${c(`×${configs.rules}`, COMMENT)} ${dim("rules")}`);
-  if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, config.style === "powerline" ? PL_BRIGHT : CYAN)} ${c(`×${configs.mcps}`, config.style === "powerline" ? PL_BRIGHT : CYAN)} ${dim("MCPs")}`);
+  if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, CYAN)} ${c(`×${configs.mcps}`, CYAN)} ${dim("MCPs")}`);
   if (configs.skills > 0) cfgParts.push(`${c(`×${configs.skills}`, PURPLE)} ${dim("skills")}`);
   if (cfgParts.length > 0) lines.push(cfgParts.join(` ${sep} `));
 
@@ -449,7 +408,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   }
 
   // ── Matrix rain (if enabled) ──
-  if (config.rain) {
+  if (true) { // rain always on
     const total = lines.length;
     for (let i = 0; i < total; i++) {
       lines[i] = `${makeRain(i, total)}${lines[i]}`;
@@ -474,52 +433,10 @@ function refreshHud(ctx: any) {
 // ═══════════════════════════════════════════════════════════════
 
 export default function (pi: ExtensionAPI) {
-  // ── Command: /shannon-statusline ──
-  pi.registerCommand("shannon-statusline", {
-    description: "Toggle HUD style or matrix rain",
-    handler: async (args, ctx) => {
-      const a = (args ?? "").trim().toLowerCase();
-
-      if (a.startsWith("style")) {
-        const styleArg = a.replace("style", "").trim();
-        const validStyles: HUDStyle[] = ["cyberpunk", "powerline"];
-        if (validStyles.includes(styleArg as HUDStyle)) {
-          config.style = styleArg as HUDStyle;
-          saveConfig(config);
-          refreshHud(ctx);
-          ctx.ui.notify(`Shannon HUD → ${styleArg}`, "info");
-        } else {
-          ctx.ui.notify(`Unknown style: "${styleArg}". Use: cyberpunk | powerline`, "warn");
-        }
-      } else if (a.startsWith("rain")) {
-        const rainArg = a.replace("rain", "").trim();
-        if (rainArg === "on") {
-          config.rain = true;
-          saveConfig(config);
-          refreshHud(ctx);
-          ctx.ui.notify("Matrix rain: ON", "info");
-        } else if (rainArg === "off") {
-          config.rain = false;
-          saveConfig(config);
-          refreshHud(ctx);
-          ctx.ui.notify("Matrix rain: OFF", "info");
-        } else {
-          ctx.ui.notify(`Use: /shannon-statusline rain on|off`, "warn");
-        }
-      } else {
-        ctx.ui.notify(
-          "Shannon HUD commands:\n" +
-          "  style cyberpunk | powerline\n" +
-          "  rain on | off",
-          "info",
-        );
-      }
-    },
-  });
+  // No slash commands — always-on cyberpunk HUD
 
   // ── Events ──
   pi.on("session_start", (_event, ctx) => {
-    config = loadConfig();
     sessionStartTime = Date.now();
     turnIndex = 0;
     cwd = ctx.cwd;
