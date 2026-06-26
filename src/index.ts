@@ -62,6 +62,12 @@ interface GitStatus {
   untracked: number;
 }
 
+interface AgentRecord {
+  status: "running" | "completed";
+  startTime: number;
+  endTime?: number;
+}
+
 interface ToolRecord {
   name: string;
   target: string | null;
@@ -76,6 +82,7 @@ interface ToolRecord {
 
 let sessionStartTime = 0;
 let tools: ToolRecord[] = [];
+let agents: AgentRecord[] = [];
 let modelProvider = "";
 let modelId = "";
 let cwd = "";
@@ -322,7 +329,7 @@ function countConfigs(dir: string) {
 async function buildHud(ctx: any): Promise<string[]> {
   const lines: string[] = [];
   const dir = cwd;
-  const sep = config.style === "powerline" ? ` ${PL_SEP}│${R} ` : ` ${COMMENT}│${R} `;
+  const sep = config.style === "powerline" ? `${PL_SEP}│${R}` : `${COMMENT}│${R}`;
 
   // ── Line 1: Project + Git + Duration ──
   const parts1: string[] = [];
@@ -411,7 +418,7 @@ async function buildHud(ctx: any): Promise<string[]> {
     if (count > 0) toolLineParts.push(`${GREEN} ${c(name, FG)}${count > 1 ? ` ${c(`×${count}`, COMMENT)}` : ""}`);
   }
   if (toolLineParts.length > 0) {
-    lines.push(`${COMMENT}${"─".repeat(50)}${R}`);
+    lines.push(`${COMMENT}${"─".repeat(67)}${R}`);
     lines.push(toolLineParts.join(`  ${sep}  `));
   }
 
@@ -421,6 +428,19 @@ async function buildHud(ctx: any): Promise<string[]> {
     const elapsed = fmtDuration(Date.now() - t.startTime);
     const target = t.target ? `: ${shortenDisplayPath(t.target, homedir(), 22)}` : "";
     lines.push(`${c(I_RUN, YELLOW)} ${c(t.name, CYAN)}${target} ${c(`(${elapsed})`, COMMENT)}`);
+  }
+
+  // ── Agent activity ──
+  const agentRunning = agents.filter(a => a.status === "running");
+  const agentCompleted = agents.filter(a => a.status === "completed");
+  if (agentRunning.length > 0 || agentCompleted.length > 0) {
+    lines.push(`${COMMENT}${"─".repeat(67)}${R}`);
+    for (const a of agentRunning) {
+      lines.push(`${c(I_RUN, YELLOW)} ${c("agent", PURPLE)} ${c(`(${fmtDuration(Date.now() - a.startTime)})`, COMMENT)}`);
+    }
+    if (agentCompleted.length > 0) {
+      lines.push(`${GREEN} ${c("agent", PURPLE)} ${c(`×${agentCompleted.length}`, COMMENT)}`);
+    }
   }
 
   // ── Matrix rain (if enabled) ──
@@ -540,5 +560,18 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("turn_end", (_event, ctx) => refreshHud(ctx));
-  pi.on("agent_end", (_event, ctx) => refreshHud(ctx));
+  pi.on("agent_end", (_event, ctx) => {
+    // Mark running agents as completed
+    for (const a of agents) {
+      if (a.status === "running") {
+        a.status = "completed";
+        a.endTime = Date.now();
+      }
+    }
+    refreshHud(ctx);
+  });
+  pi.on("agent_start", (_event, ctx) => {
+    agents.push({ status: "running", startTime: Date.now() });
+    refreshHud(ctx);
+  });
 }
