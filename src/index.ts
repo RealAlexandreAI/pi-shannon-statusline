@@ -391,7 +391,7 @@ async function buildHud(ctx: any): Promise<string[]> {
       const totalTokens = usage.tokens ?? 0;
       let tokStr = `${c(I_IN, CYAN)} ${c(fmtTokens(totalTokens), FG)}`;
 
-      const line2 = `${modelStr}  ${sep}  ${ctxStr}  ${sep}  ${tokStr}`;
+      const line2 = `${modelStr} ${sep} ${ctxStr} ${sep} ${tokStr}`;
       lines.push(line2);
     } else {
       lines.push(modelStr);
@@ -419,7 +419,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   }
   if (toolLineParts.length > 0) {
     lines.push(`${COMMENT}${"─".repeat(67)}${R}`);
-    lines.push(toolLineParts.join(`  ${sep}  `));
+    lines.push(toolLineParts.join(` ${sep} `));
   }
 
   // ── Running tools ──
