@@ -27,7 +27,6 @@ pi install .
 /shannon-statusline style powerline   # Bright separator bars, muted accents
 /shannon-statusline rain on           # Enable matrix rain
 /shannon-statusline rain off          # Disable matrix rain
-/shannon-statusline                   # Toggle rain (convenience)
 ```
 
 Config saved to `~/.pi/shannon-statusline.json`.

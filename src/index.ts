@@ -491,10 +491,12 @@ export default function (pi: ExtensionAPI) {
           ctx.ui.notify(`Use: /shannon-statusline rain on|off`, "warn");
         }
       } else {
-        config.rain = !config.rain;
-        saveConfig(config);
-        refreshHud(ctx);
-        ctx.ui.notify(`Matrix rain: ${config.rain ? "ON" : "OFF"}`, "info");
+        ctx.ui.notify(
+          "Shannon HUD commands:\n" +
+          "  style cyberpunk | powerline\n" +
+          "  rain on | off",
+          "info",
+        );
       }
     },
   });
