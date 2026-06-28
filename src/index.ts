@@ -75,6 +75,7 @@ function c(text: string, color: string) { return `${color}${text}${R}`; }
 function dim(text: string) { return `${D}${text}${R}`; }
 
 // Icons (aligned with shannon-statusline)
+const I_MODEL = "λ";
 const I_PATH = "⌘";
 const I_BRANCH = "⎇";
 const I_CLOCK = "✦";
@@ -342,13 +343,13 @@ async function buildHud(ctx: any): Promise<string[]> {
   const providerColor = COMMENT;
   let modelStr: string;
   if (modelProvider && modelId) {
-    modelStr = `${c(I_IN, modelColor)} ${c(modelProvider, providerColor)}${dim("/")}${c(modelId, modelColor)}`;
+    modelStr = `${c(I_MODEL, modelColor)} ${c(modelProvider, providerColor)}${dim("/")}${c(modelId, modelColor)}`;
   } else if (modelId) {
-    modelStr = `${c(I_IN, modelColor)} ${c(modelId, modelColor)}`;
+    modelStr = `${c(I_MODEL, modelColor)} ${c(modelId, modelColor)}`;
   } else if (modelProvider) {
-    modelStr = `${c(I_IN, modelColor)} ${c(modelProvider, modelColor)}`;
+    modelStr = `${c(I_MODEL, modelColor)} ${c(modelProvider, modelColor)}`;
   } else {
-    modelStr = `${c(I_IN, modelColor)} ${c("pi", modelColor)}`;
+    modelStr = `${c(I_MODEL, modelColor)} ${c("pi", modelColor)}`;
   }
 
   // Thinking level removed — Pi doesn't expose real-time value in event context
