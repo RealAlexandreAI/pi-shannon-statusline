@@ -54,8 +54,6 @@ let cwd = "";
 
 // ═══════════════════════════════════════════════════════════════
 // ANSI palette
-// ═══════════════════════════════════════════════════════════════
-
 const R = "\x1b[0m";
 const D = "\x1b[2m";
 
@@ -70,6 +68,7 @@ const ORANGE = "\x1b[38;5;208m";
 const CYAN = "\x1b[38;5;123m";
 const PURPLE = "\x1b[38;5;141m";
 const YELLOW = "\x1b[38;5;221m";
+const BLUE = "\x1b[38;5;111m";
 
 function c(text: string, color: string) { return `${color}${text}${R}`; }
 function dim(text: string) { return `${D}${text}${R}`; }
@@ -379,7 +378,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   // ── Line 3: Config counts ──
   const configs = countConfigs(dir);
   const cfgParts: string[] = [];
-  if (configs.agentsMd > 0) cfgParts.push(`${c(I_CLAUDE, ORANGE)} ${c(`×${configs.agentsMd}`, ORANGE)} ${dim("AGENTS.md")}`);
+  if (configs.agentsMd > 0) cfgParts.push(`${c(I_CLAUDE, BLUE)} ${c(`×${configs.agentsMd}`, BLUE)} ${dim("AGENTS.md")}`);
   if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, CYAN)} ${c(`×${configs.mcps}`, CYAN)} ${dim("MCPs")}`);
   if (configs.skills > 0) cfgParts.push(`${c(I_SKILL, PURPLE)} ${c(`×${configs.skills}`, PURPLE)} ${dim("skills")}`);
   if (configs.extensions > 0) cfgParts.push(`${c(I_EXT, YELLOW)} ${c(`×${configs.extensions}`, YELLOW)} ${dim("extensions")}`);
