@@ -5,7 +5,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
@@ -74,16 +74,20 @@ const YELLOW = "\x1b[38;5;221m";
 function c(text: string, color: string) { return `${color}${text}${R}`; }
 function dim(text: string) { return `${D}${text}${R}`; }
 
-// Icons
+// Icons (aligned with shannon-statusline)
 const I_PATH = "⌘";
 const I_BRANCH = "⎇";
 const I_CLOCK = "✦";
 const I_CTX = "⊡";
 const I_IN = "↑";
+const I_OUT = "↓";
+const I_CACHE = "⊗";
 const I_DONE = "✔";
 const I_RUN = "↻";
 const I_CLAUDE = "※";
 const I_MCP = "⊕";
+const I_SKILL = "★";
+const I_EXT = "◈";
 
 // ═══════════════════════════════════════════════════════════════
 // Fish-style path shortening (from original shannon-statusline)
@@ -263,23 +267,34 @@ async function getGit(dir: string): Promise<GitStatus | null> {
 // ═══════════════════════════════════════════════════════════════
 
 function countConfigs(dir: string) {
-  let claudeMd = 0, rules = 0, mcps = 0, skills = 0;
+  let agentsMd = 0, mcps = 0, skills = 0, extensions = 0;
+  const home = homedir();
   try {
-    if (existsSync(join(dir, "AGENTS.md"))) claudeMd++;
-    if (existsSync(join(dir, "CLAUDE.md"))) claudeMd++;
-    if (existsSync(join(dir, ".claude", "CLAUDE.md"))) claudeMd++;
-    if (existsSync(join(dir, ".pi", "agent", "AGENTS.md"))) claudeMd++;
+    // AGENTS.md in project
+    if (existsSync(join(dir, "AGENTS.md"))) agentsMd++;
+    if (existsSync(join(dir, "CLAUDE.md"))) agentsMd++;
 
-    const rulesDir = join(dir, ".claude", "rules");
-    if (existsSync(rulesDir)) rules = readdirSync(rulesDir).filter(f => f.endsWith(".md")).length;
+    // MCPs from pi cache
+    try {
+      const mcpCache = JSON.parse(readFileSync(join(home, ".pi", "agent", "mcp-cache.json"), "utf8"));
+      const servers = mcpCache?.servers;
+      if (servers && typeof servers === "object") mcps = Object.keys(servers).length;
+    } catch { /* ignore */ }
 
-    if (existsSync(join(dir, ".mcp.json"))) mcps++;
-    if (existsSync(join(dir, ".config", "mcp", "mcp.json"))) mcps++;
+    // Skills from pi skills directory
+    const skillsDir = join(home, ".pi", "agent", "skills");
+    if (existsSync(skillsDir)) {
+      skills = readdirSync(skillsDir).filter(f => !f.startsWith(".")).length;
+    }
 
-    const skillsDir = join(dir, ".claude", "skills");
-    if (existsSync(skillsDir)) skills = readdirSync(skillsDir, { recursive: true }).filter(f => f.endsWith("SKILL.md")).length;
+    // Extensions from pi settings.json packages
+    try {
+      const settings = JSON.parse(readFileSync(join(home, ".pi", "agent", "settings.json"), "utf8"));
+      const packages: string[] = settings?.packages ?? [];
+      extensions = packages.length;
+    } catch { /* ignore */ }
   } catch { /* ignore */ }
-  return { claudeMd, rules, mcps, skills };
+  return { agentsMd, mcps, skills, extensions };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -363,10 +378,10 @@ async function buildHud(ctx: any): Promise<string[]> {
   // ── Line 3: Config counts ──
   const configs = countConfigs(dir);
   const cfgParts: string[] = [];
-  if (configs.claudeMd > 0) cfgParts.push(`${c(I_CLAUDE, ORANGE)} ${c(`×${configs.claudeMd}`, ORANGE)} ${dim("AGENTS.md")}`);
-  if (configs.rules > 0) cfgParts.push(`${c(`×${configs.rules}`, COMMENT)} ${dim("rules")}`);
+  if (configs.agentsMd > 0) cfgParts.push(`${c(I_CLAUDE, ORANGE)} ${c(`×${configs.agentsMd}`, ORANGE)} ${dim("AGENTS.md")}`);
   if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, CYAN)} ${c(`×${configs.mcps}`, CYAN)} ${dim("MCPs")}`);
-  if (configs.skills > 0) cfgParts.push(`${c(`×${configs.skills}`, PURPLE)} ${dim("skills")}`);
+  if (configs.skills > 0) cfgParts.push(`${c(I_SKILL, PURPLE)} ${c(`×${configs.skills}`, PURPLE)} ${dim("skills")}`);
+  if (configs.extensions > 0) cfgParts.push(`${c(I_EXT, YELLOW)} ${c(`×${configs.extensions}`, YELLOW)} ${dim("extensions")}`);
   if (cfgParts.length > 0) lines.push(cfgParts.join(` ${sep} `));
 
   // ── Separator + Tool counts ──
@@ -379,6 +394,13 @@ async function buildHud(ctx: any): Promise<string[]> {
     const count = toolCounts.get(name) ?? 0;
     if (count > 0) toolLineParts.push(`${GREEN} ${c(name, FG)}${count > 1 ? ` ${c(`×${count}`, COMMENT)}` : ""}`);
   }
+
+  // Active agent count on the right side
+  const activeAgents = agents.filter(a => a.status === "running").length;
+  if (activeAgents > 0) {
+    toolLineParts.push(`${c(I_RUN, PURPLE)} ${c("agent", PURPLE)} ${c(`×${activeAgents}`, PURPLE)}`);
+  }
+
   if (toolLineParts.length > 0) {
     lines.push(`${COMMENT}${"─".repeat(67)}${R}`);
     lines.push(toolLineParts.join(` ${sep} `));
@@ -390,21 +412,6 @@ async function buildHud(ctx: any): Promise<string[]> {
     const elapsed = fmtDuration(Date.now() - t.startTime);
     const target = t.target ? `: ${shortenDisplayPath(t.target, homedir(), 22)}` : "";
     lines.push(`${c(I_RUN, YELLOW)} ${c(t.name, CYAN)}${target} ${c(`(${elapsed})`, COMMENT)}`);
-  }
-
-  // ── Agent activity ──
-  const agentRunning = agents.filter(a => a.status === "running");
-  const agentCompleted = agents.filter(a => a.status === "completed");
-  if (agentRunning.length > 0 || agentCompleted.length > 0) {
-    lines.push(`${COMMENT}${"─".repeat(67)}${R}`);
-    const parts: string[] = [];
-    for (const a of agentRunning) {
-      parts.push(`${c(I_RUN, YELLOW)} ${c("agent", PURPLE)} ${c(`(${fmtDuration(Date.now() - a.startTime)})`, COMMENT)}`);
-    }
-    if (agentCompleted.length > 0) {
-      parts.push(`${c("agent", PURPLE)} ${GREEN} ${c(`×${agentCompleted.length}`, COMMENT)}`);
-    }
-    lines.push(parts.join(` ${sep} `));
   }
 
   // ── Matrix rain (if enabled) ──
