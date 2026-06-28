@@ -338,17 +338,16 @@ async function buildHud(ctx: any): Promise<string[]> {
   lines.push(parts1.join(` ${sep} `));
 
   // ── Line 2: Model (provider/id) + Thinking level + Context + Tokens ──
-  const modelColor = CYAN;
   const providerColor = COMMENT;
   let modelStr: string;
   if (modelProvider && modelId) {
-    modelStr = `${c(I_MODEL, modelColor)} ${c(modelProvider, providerColor)}${dim("/")}${c(modelId, modelColor)}`;
+    modelStr = `${c(I_MODEL, BLUE)} ${c(modelProvider, providerColor)}${dim("/")}${c(modelId, BLUE)}`;
   } else if (modelId) {
-    modelStr = `${c(I_MODEL, modelColor)} ${c(modelId, modelColor)}`;
+    modelStr = `${c(I_MODEL, BLUE)} ${c(modelId, BLUE)}`;
   } else if (modelProvider) {
-    modelStr = `${c(I_MODEL, modelColor)} ${c(modelProvider, modelColor)}`;
+    modelStr = `${c(I_MODEL, BLUE)} ${c(modelProvider, BLUE)}`;
   } else {
-    modelStr = `${c(I_MODEL, modelColor)} ${c("pi", modelColor)}`;
+    modelStr = `${c(I_MODEL, BLUE)} ${c("pi", BLUE)}`;
   }
 
   // Thinking level removed — Pi doesn't expose real-time value in event context
@@ -379,7 +378,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   const configs = countConfigs(dir);
   const cfgParts: string[] = [];
   if (configs.agentsMd > 0) cfgParts.push(`${c(I_CLAUDE, BLUE)} ${c(`×${configs.agentsMd}`, BLUE)} ${dim("AGENTS.md")}`);
-  if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, CYAN)} ${c(`×${configs.mcps}`, CYAN)} ${dim("MCPs")}`);
+  if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, ORANGE)} ${c(`×${configs.mcps}`, ORANGE)} ${dim("MCPs")}`);
   if (configs.skills > 0) cfgParts.push(`${c(I_SKILL, PURPLE)} ${c(`×${configs.skills}`, PURPLE)} ${dim("skills")}`);
   if (configs.extensions > 0) cfgParts.push(`${c(I_EXT, YELLOW)} ${c(`×${configs.extensions}`, YELLOW)} ${dim("extensions")}`);
   if (cfgParts.length > 0) lines.push(cfgParts.join(` ${sep} `));
