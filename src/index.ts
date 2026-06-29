@@ -389,7 +389,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   for (const t of completed) toolCounts.set(t.name, (toolCounts.get(t.name) ?? 0) + 1);
 
   const toolLineParts: string[] = [];
-  for (const name of ["read", "edit", "write", "bash", "grep", "find", "ls"]) {
+  for (const name of toolCounts.keys()) {
     const count = toolCounts.get(name) ?? 0;
     if (count > 0) toolLineParts.push(`${GREEN} ${c(name, FG)}${count > 1 ? ` ${c(`×${count}`, COMMENT)}` : ""}`);
   }
@@ -479,6 +479,8 @@ export default function (pi: ExtensionAPI) {
       else if (typeof inp.filePath === "string") tool.target = inp.filePath;
     }
     tools.push(tool);
+    // Ponytail: cap at 500 to prevent unbounded growth over long sessions
+    if (tools.length > 500) tools = tools.slice(-400);
     refreshHud(ctx);
   });
 
@@ -495,12 +497,11 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("turn_end", (_event, ctx) => refreshHud(ctx));
   pi.on("agent_end", (_event, ctx) => {
-    // Mark running agents as completed
-    for (const a of agents) {
-      if (a.status === "running") {
-        a.status = "completed";
-        a.endTime = Date.now();
-      }
+    // Mark the most recently started running agent as completed
+    const running = agents.find(a => a.status === "running");
+    if (running) {
+      running.status = "completed";
+      running.endTime = Date.now();
     }
     refreshHud(ctx);
   });
