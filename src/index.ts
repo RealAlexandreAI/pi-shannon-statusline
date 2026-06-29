@@ -169,6 +169,15 @@ function ctxPctColor(percent: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Tool whitelist — only Pi-native tools shown in HUD
+// ═══════════════════════════════════════════════════════════════
+
+const TOOL_WHITELIST = new Set([
+  "read", "write", "edit", "bash",
+  "grep", "ls", "find",
+]);
+
+// ═══════════════════════════════════════════════════════════════
 // Formatters
 // ═══════════════════════════════════════════════════════════════
 
@@ -384,7 +393,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   if (cfgParts.length > 0) lines.push(cfgParts.join(` ${sep} `));
 
   // ── Separator + Tool counts ──
-  const completed = tools.filter(t => t.status === "completed");
+  const completed = tools.filter(t => t.status === "completed" && TOOL_WHITELIST.has(t.name));
   const toolCounts = new Map<string, number>();
   for (const t of completed) toolCounts.set(t.name, (toolCounts.get(t.name) ?? 0) + 1);
 

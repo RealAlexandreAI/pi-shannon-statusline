@@ -51,14 +51,21 @@ interface AgentRecord {
 // Tool count rendering (extracted from buildHud)
 // ═══════════════════════════════════════════════════════════════
 
+// Tool whitelist (mirrors src/index.ts)
+const TOOL_WHITELIST = new Set([
+  "read", "write", "edit", "bash",
+  "grep", "ls", "find",
+]);
+
 function renderToolCounts(tools: ToolRecord[]): string[] {
   const sep = `${COMMENT}│${R}`;
-  const completed = tools.filter(t => t.status === "completed");
+  const completed = tools.filter(t => t.status === "completed" && TOOL_WHITELIST.has(t.name));
   const toolCounts = new Map<string, number>();
   for (const t of completed) toolCounts.set(t.name, (toolCounts.get(t.name) ?? 0) + 1);
 
+  const order = ["read", "edit", "write", "bash", "grep", "ls", "find"];
   const parts: string[] = [];
-  for (const name of ["read", "edit", "write", "bash", "grep", "find", "ls"]) {
+  for (const name of order) {
     const count = toolCounts.get(name) ?? 0;
     if (count > 0) parts.push(`${GREEN} ${c(name, R.replace("\x1b[0m", ""))}${count > 1 ? ` ${c(`×${count}`, COMMENT)}` : ""}`);
   }
@@ -69,7 +76,7 @@ function renderToolCounts(tools: ToolRecord[]): string[] {
   const FG = "\x1b[38;5;252m";
   // rebuild with proper color
   const rebuilt: string[] = [];
-  for (const name of ["read", "edit", "write", "bash", "grep", "find", "ls"]) {
+  for (const name of order) {
     const count = toolCounts.get(name) ?? 0;
     if (count > 0) rebuilt.push(`${GREEN} ${c(name, FG)}${count > 1 ? ` ${c(`×${count}`, COMMENT)}` : ""}`);
   }
@@ -151,7 +158,7 @@ describe("renderToolCounts", () => {
       { name: "read", status: "completed", startTime: 0 },
       { name: "bash", status: "running", startTime: 1 },
       { name: "grep", status: "error", startTime: 2 },
-    ], "cyberpunk");
+    ]);
     const text = lines.map(stripANSI).join("\n");
     assert.ok(text.includes("read"), `should include completed read: ${text}`);
     assert.ok(!text.includes("bash"), `should not include running bash: ${text}`);
@@ -165,11 +172,11 @@ describe("renderToolCounts", () => {
       { name: "write", status: "completed", startTime: 2 },
       { name: "bash", status: "completed", startTime: 3 },
       { name: "grep", status: "completed", startTime: 4 },
-      { name: "find", status: "completed", startTime: 5 },
-      { name: "ls", status: "completed", startTime: 6 },
-    ], "cyberpunk");
+      { name: "ls", status: "completed", startTime: 5 },
+      { name: "find", status: "completed", startTime: 6 },
+    ]);
     const text = lines.map(stripANSI).join("\n");
-    const names = ["read", "edit", "write", "bash", "grep", "find", "ls"];
+    const names = ["read", "edit", "write", "bash", "grep", "ls", "find"];
     let lastIdx = -1;
     for (const name of names) {
       const idx = text.indexOf(name);
@@ -182,6 +189,32 @@ describe("renderToolCounts", () => {
     const lines = renderToolCounts([{ name: "read", status: "completed", startTime: 0 }]);
     const sep = stripANSI(lines[0]!);
     assert.equal(sep.length, 67, `separator should be 67 chars, got ${sep.length}: "${sep}"`);
+  });
+
+  it("filters out non-whitelisted tools", () => {
+    const lines = renderToolCounts([
+      { name: "read", status: "completed", startTime: 0 },
+      { name: "mcp__some_server_tool", status: "completed", startTime: 1 },
+      { name: "codegraph_explore", status: "completed", startTime: 2 },
+    ]);
+    const text = lines.map(stripANSI).join("\n");
+    assert.ok(text.includes("read"), `should include whitelisted read: ${text}`);
+    assert.ok(!text.includes("mcp__"), `should not include non-whitelisted mcp__: ${text}`);
+    assert.ok(!text.includes("codegraph"), `should not include non-whitelisted codegraph: ${text}`);
+  });
+
+  it("returns empty when only non-whitelisted tools completed", () => {
+    const lines = renderToolCounts([
+      { name: "third_party_tool", status: "completed", startTime: 0 },
+    ]);
+    assert.deepStrictEqual(lines, []);
+  });
+
+  it("returns empty when no completed tools at all", () => {
+    const lines = renderToolCounts([
+      { name: "read", status: "running", startTime: 0 },
+    ]);
+    assert.deepStrictEqual(lines, []);
   });
 });
 
