@@ -198,19 +198,44 @@ function fmtDuration(ms: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// User config (~/.pi/agent/shannon-statusline.json)
+// ═══════════════════════════════════════════════════════════════
+
+interface ShannonConfig {
+  /** Enable the left-side matrix rain column. Default: true */
+  rain: boolean;
+  /** Character set for the rain. Default: katakana + digits + greek */
+  rainChars: string;
+}
+
+const DEFAULT_RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
+
+function loadConfig(): ShannonConfig {
+  const cfg: ShannonConfig = { rain: true, rainChars: DEFAULT_RAIN_CHARS };
+  try {
+    const cfgPath = join(homedir(), ".pi", "agent", "shannon-statusline.json");
+    if (existsSync(cfgPath)) {
+      const raw = JSON.parse(readFileSync(cfgPath, "utf8")) as Partial<ShannonConfig>;
+      if (typeof raw.rain === "boolean") cfg.rain = raw.rain;
+      if (typeof raw.rainChars === "string" && raw.rainChars.length > 0) cfg.rainChars = raw.rainChars;
+    }
+  } catch { /* ignore - fall back to defaults */ }
+  return cfg;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Matrix rain (6 columns like original)
 // ═══════════════════════════════════════════════════════════════
 
-const RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
 const RAIN_COLS = 6;
 const RAIN_SPEED_MS = 900;
 const RAIN_COL_OFFSET_MS = 280;
 
-function rainCell(row: number, col: number, now: number, total: number): string {
+function rainCell(row: number, col: number, now: number, total: number, chars: string): string {
   const colPhase = ((now + col * RAIN_COL_OFFSET_MS) / RAIN_SPEED_MS) % total;
   const headRow = Math.floor(colPhase);
   const dist = (row - headRow + total) % total;
-  const ch = RAIN_CHARS[Math.floor(now / 350 + row * 7 + col * 13) % RAIN_CHARS.length] ?? " ";
+  const ch = chars[Math.floor(now / 350 + row * 7 + col * 13) % chars.length] ?? " ";
 
   if (dist === 0) return `${rgb(200, 255, 200)}${ch}${R}`;
   if (dist === 1) return `${rgb(57, 255, 20)}${ch}${R}`;
@@ -222,11 +247,10 @@ function rainCell(row: number, col: number, now: number, total: number): string 
   return `${rgb(8, 8, 8)}${ch}${R}`;
 }
 
-function makeRain(row: number, total: number): string {
-  // rain always on, no early return
+function makeRain(row: number, total: number, chars: string): string {
   const now = Date.now();
   const cells: string[] = [];
-  for (let c = 0; c < RAIN_COLS; c++) cells.push(rainCell(row, c, now, total));
+  for (let c = 0; c < RAIN_COLS; c++) cells.push(rainCell(row, c, now, total, chars));
   return `${cells.join(" ")}  `;
 }
 
@@ -314,6 +338,7 @@ async function buildHud(ctx: any): Promise<string[]> {
   const lines: string[] = [];
   const dir = cwd;
   const sep = `${COMMENT}│${R}`;
+  const config = loadConfig();
 
   // ── Line 1: Project + Git + Duration ──
   const parts1: string[] = [];
@@ -422,11 +447,11 @@ async function buildHud(ctx: any): Promise<string[]> {
     lines.push(`${c(I_RUN, YELLOW)} ${c(t.name, CYAN)}${target} ${c(`(${elapsed})`, COMMENT)}`);
   }
 
-  // ── Matrix rain (if enabled) ──
-  if (true) { // rain always on
+  // ── Matrix rain (configurable via ~/.pi/agent/shannon-statusline.json) ──
+  if (config.rain) {
     const total = lines.length;
     for (let i = 0; i < total; i++) {
-      lines[i] = `${makeRain(i, total)}${lines[i]}`;
+      lines[i] = `${makeRain(i, total, config.rainChars)}${lines[i]}`;
     }
   }
 
