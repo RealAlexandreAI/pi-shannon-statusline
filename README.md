@@ -64,7 +64,7 @@ Optional. Defaults work with zero config, but you can customize the matrix rain 
 
 > **Font note:** the default rain uses half-width katakana (`ｦｧｨｩ…`) which require a CJK-capable font. If you see tofu boxes (乱码), either install a CJK font (e.g. [Sarasa Mono](https://github.com/be5invis/Sarasa-Gothic)), set `rainChars` to characters your font supports, or set `"rain": false`.
 
-Changes apply after `/reload` in Pi.
+Config is re-read on every HUD refresh, so changes take effect on the next refresh — no `/reload` needed.
 
 ## Features
 

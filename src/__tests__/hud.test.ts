@@ -5,6 +5,9 @@
 
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // ═══════════════════════════════════════════════════════════════
 // Copy of production render logic (pure, no fs/child_process deps)
@@ -109,6 +112,85 @@ function renderAgentActivity(agents: AgentRecord[]): string[] {
 function stripANSI(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Config loading (mirrors src/index.ts, home dir parameterized)
+// ═══════════════════════════════════════════════════════════════
+
+const DEFAULT_RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
+
+function loadConfig(homeDir: string): { rain: boolean; rainChars: string } {
+  const cfg = { rain: true, rainChars: DEFAULT_RAIN_CHARS };
+  try {
+    const cfgPath = join(homeDir, ".pi", "agent", "shannon-statusline.json");
+    if (existsSync(cfgPath)) {
+      const raw = JSON.parse(readFileSync(cfgPath, "utf8")) as Partial<{ rain: boolean; rainChars: string }>;
+      if (typeof raw.rain === "boolean") cfg.rain = raw.rain;
+      if (typeof raw.rainChars === "string" && raw.rainChars.length > 0) cfg.rainChars = raw.rainChars;
+    }
+  } catch { /* ignore - fall back to defaults */ }
+  return cfg;
+}
+
+function makeTempHome(): string {
+  const home = mkdtempSync(join(tmpdir(), "shannon-cfg-"));
+  mkdirSync(join(home, ".pi", "agent"), { recursive: true });
+  return home;
+}
+
+describe("loadConfig", () => {
+  it("returns defaults when no config file exists", () => {
+    const home = makeTempHome();
+    const cfg = loadConfig(home);
+    assert.equal(cfg.rain, true);
+    assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("respects rain: false", () => {
+    const home = makeTempHome();
+    writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), JSON.stringify({ rain: false }));
+    const cfg = loadConfig(home);
+    assert.equal(cfg.rain, false);
+    assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS, "rainChars should stay default when not provided");
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("uses custom rainChars", () => {
+    const home = makeTempHome();
+    writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), JSON.stringify({ rain: true, rainChars: "0123456789ABC" }));
+    const cfg = loadConfig(home);
+    assert.equal(cfg.rain, true);
+    assert.equal(cfg.rainChars, "0123456789ABC");
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("falls back to default chars when rainChars is empty", () => {
+    const home = makeTempHome();
+    writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), JSON.stringify({ rain: true, rainChars: "" }));
+    const cfg = loadConfig(home);
+    assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("falls back to defaults on corrupt JSON", () => {
+    const home = makeTempHome();
+    writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), "{ bad json ");
+    const cfg = loadConfig(home);
+    assert.equal(cfg.rain, true);
+    assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("falls back to defaults on wrong types", () => {
+    const home = makeTempHome();
+    writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), JSON.stringify({ rain: "yes", rainChars: 42 }));
+    const cfg = loadConfig(home);
+    assert.equal(cfg.rain, true);
+    assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
+    rmSync(home, { recursive: true, force: true });
+  });
+});
 
 // ═══════════════════════════════════════════════════════════════
 // Tests
