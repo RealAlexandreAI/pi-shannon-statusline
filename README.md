@@ -27,7 +27,7 @@ A live cyberpunk HUD rendered below every Pi response:
 ↻ agent (3s)  │  ✔ agent ×2
 ```
 
-Matrix katakana rain on the left. Monokai Pro palette. No config, no commands — plug and play.
+Matrix katakana rain on the left. Monokai Pro palette. Plug and play - optional config for the matrix rain.
 
 ---
 
@@ -46,6 +46,26 @@ cd pi-shannon-statusline && pi install .
 
 ---
 
+## Configuration
+
+Optional. Defaults work with zero config, but you can customize the matrix rain via `~/.pi/agent/shannon-statusline.json`:
+
+```json
+{
+  "rain": false,
+  "rainChars": "0123456789λΨΩΔΦABCDEFGH"
+}
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `rain` | boolean | `true` | Enable the left-side matrix rain column |
+| `rainChars` | string | katakana + digits + greek | Character set picked at random for the rain |
+
+> **Font note:** the default rain uses half-width katakana (`ｦｧｨｩ…`) which require a CJK-capable font. If you see tofu boxes (乱码), either install a CJK font (e.g. [Sarasa Mono](https://github.com/be5invis/Sarasa-Gothic)), set `rainChars` to characters your font supports, or set `"rain": false`.
+
+Changes apply after `/reload` in Pi.
+
 ## Features
 
 | Section | Content |
@@ -56,7 +76,7 @@ cd pi-shannon-statusline && pi install .
 | **Config counts** | AGENTS.md ×N, rules ×N, MCPs ×N, skills ×N |
 | **Tool activity** | Completed tool counts, running tools with elapsed time |
 | **Agent activity** | Running agent timer, completed agent count |
-| **Matrix rain** | 6-column animated katakana rain, always on |
+| **Matrix rain** | 6-column animated katakana rain (configurable) |
 
 ## Pi-native advantages
 
@@ -65,7 +85,7 @@ cd pi-shannon-statusline && pi install .
 - **Session-aware** — resets on `/new`, `/resume`, `/fork`
 - **Model auto-detection** — updates on `model_select` event
 - **Tool/agent tracking** — hooks `tool_call`, `tool_result`, `agent_start`, `agent_end`
-- **Zero config** — install and go
+- **Zero config by default** - install and go, optional JSON for the rain
 
 ## Testing
 
