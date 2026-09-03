@@ -1,6 +1,6 @@
 {
   "name": "pi-shannon-statusline",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Cyberpunk terminal HUD for Pi — ported from shannon-statusline for Claude Code",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,7 @@
   },
   "repository": "github:RealAlexandreAI/pi-shannon-statusline",
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.83.0"
+    "@earendil-works/pi-coding-agent": ">=0.84.4"
   },
   "keywords": [
     "pi-package",

@@ -76,6 +76,7 @@ Config is re-read on every HUD refresh, so changes take effect on the next refre
 | **Config counts** | AGENTS.md ×N, rules ×N, MCPs ×N, skills ×N |
 | **Tool activity** | Completed tool counts, running tools with elapsed time |
 | **Agent activity** | Running agent timer, completed agent count |
+| **Waiting for user** | `⧗ waiting for user (select) "…"` while a blocking extension UI prompt is open (pi ≥ 0.84.4) |
 | **Matrix rain** | 6-column animated katakana rain (configurable) |
 
 ## Pi-native advantages
@@ -85,6 +86,7 @@ Config is re-read on every HUD refresh, so changes take effect on the next refre
 - **Session-aware** — resets on `/new`, `/resume`, `/fork`
 - **Model auto-detection** — updates on `model_select` event
 - **Tool/agent tracking** — hooks `tool_call`, `tool_result`, `agent_start`, `agent_end`
+- **Waiting-on-user detection** — hooks `ui_prompt_start` / `ui_prompt_end` (requires Pi ≥ 0.84.4; silently inactive on older versions)
 - **Zero config by default** - install and go, optional JSON for the rain
 
 ## Testing

@@ -51,6 +51,7 @@ let agents: AgentRecord[] = [];
 let modelProvider = "";
 let modelId = "";
 let cwd = "";
+let waitingPrompt: { kind: string; title?: string } | null = null;
 
 // ═══════════════════════════════════════════════════════════════
 // ANSI palette
@@ -88,6 +89,7 @@ const I_CLAUDE = "※";
 const I_MCP = "⊕";
 const I_SKILL = "★";
 const I_EXT = "◈";
+const I_WAIT = "⧗";
 
 // ═══════════════════════════════════════════════════════════════
 // Fish-style path shortening (from original shannon-statusline)
@@ -447,6 +449,14 @@ async function buildHud(ctx: any): Promise<string[]> {
     lines.push(`${c(I_RUN, YELLOW)} ${c(t.name, CYAN)}${target} ${c(`(${elapsed})`, COMMENT)}`);
   }
 
+  // ── Waiting on a blocking user-facing UI prompt ──
+  if (waitingPrompt) {
+    const title = waitingPrompt.title
+      ? ` ${c(waitingPrompt.title.length > 40 ? `${waitingPrompt.title.slice(0, 39)}…` : waitingPrompt.title, FG)}`
+      : "";
+    lines.push(`${c(I_WAIT, YELLOW)} ${c("waiting for user", YELLOW)} ${c(`(${waitingPrompt.kind})`, COMMENT)}${title}`);
+  }
+
   // ── Matrix rain (configurable via ~/.pi/agent/shannon-statusline.json) ──
   if (config.rain) {
     const total = lines.length;
@@ -481,6 +491,7 @@ export default function (pi: ExtensionAPI) {
     turnIndex = 0;
     cwd = ctx.cwd;
     tools = [];
+    waitingPrompt = null;
     if (ctx.model) {
       modelProvider = (ctx.model as any).provider ?? "";
       modelId = (ctx.model as any).id ?? "";
@@ -541,6 +552,17 @@ export default function (pi: ExtensionAPI) {
   });
   pi.on("agent_start", (_event, ctx) => {
     agents.push({ status: "running", startTime: Date.now() });
+    refreshHud(ctx);
+  });
+
+  // ── Waiting-on-user lifecycle (pi >= 0.84.4) ──
+  pi.on("ui_prompt_start", (event, ctx) => {
+    waitingPrompt = { kind: event.kind, title: event.title };
+    refreshHud(ctx);
+  });
+
+  pi.on("ui_prompt_end", (_event, ctx) => {
+    waitingPrompt = null;
     refreshHud(ctx);
   });
 }

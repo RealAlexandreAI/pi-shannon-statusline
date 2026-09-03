@@ -15,12 +15,14 @@ import { tmpdir } from "node:os";
 
 const R = "\x1b[0m";
 const D = "\x1b[2m";
+const FG = "\x1b[38;5;252m";
 const COMMENT = "\x1b[38;5;243m";
 const GREEN = "\x1b[38;5;154m";
 const CYAN = "\x1b[38;5;123m";
 const PURPLE = "\x1b[38;5;141m";
 const YELLOW = "\x1b[38;5;221m";
 const I_RUN = "↻";
+const I_WAIT = "⧗";
 
 function c(text: string, color: string) { return `${color}${text}${R}`; }
 
@@ -106,6 +108,14 @@ function renderAgentActivity(agents: AgentRecord[]): string[] {
   }
   lines.push(parts.join(` ${sep} `));
   return lines;
+}
+
+function renderWaitingPrompt(waiting: { kind: string; title?: string } | null): string[] {
+  if (!waiting) return [];
+  const title = waiting.title
+    ? ` ${c(waiting.title.length > 40 ? `${waiting.title.slice(0, 39)}…` : waiting.title, FG)}`
+    : "";
+  return [`${c(I_WAIT, YELLOW)} ${c("waiting for user", YELLOW)} ${c(`(${waiting.kind})`, COMMENT)}${title}`];
 }
 
 // Strip ANSI for assertion readability
@@ -353,5 +363,33 @@ describe("renderAgentActivity", () => {
     const lines = renderAgentActivity([{ status: "completed", startTime: 0 }]);
     const sep = stripANSI(lines[0]!);
     assert.equal(sep.length, 67, `separator should be 67 chars, got ${sep.length}`);
+  });
+});
+
+describe("renderWaitingPrompt", () => {
+  it("renders nothing when not waiting", () => {
+    assert.deepStrictEqual(renderWaitingPrompt(null), []);
+  });
+
+  it("renders kind when waiting without title", () => {
+    const lines = renderWaitingPrompt({ kind: "select" });
+    assert.equal(lines.length, 1);
+    const text = stripANSI(lines[0]!);
+    assert.ok(text.includes("waiting for user"), `should say waiting: ${text}`);
+    assert.ok(text.includes("(select)"), `should include kind: ${text}`);
+    assert.ok(text.includes(I_WAIT), `should include hourglass icon: ${text}`);
+  });
+
+  it("renders title when present", () => {
+    const text = stripANSI(renderWaitingPrompt({ kind: "confirm", title: "Delete file?" })![0]!);
+    assert.ok(text.includes("(confirm)"), `should include kind: ${text}`);
+    assert.ok(text.includes("Delete file?"), `should include title: ${text}`);
+  });
+
+  it("truncates titles longer than 40 chars", () => {
+    const long = "x".repeat(60);
+    const text = stripANSI(renderWaitingPrompt({ kind: "input", title: long })![0]!);
+    assert.ok(text.includes(`${"x".repeat(39)}…`), `should truncate to 39 chars + ellipsis: ${text}`);
+    assert.ok(!text.includes(long), "should not include the full title");
   });
 });
