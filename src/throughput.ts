@@ -6,6 +6,12 @@ export interface ThroughputState {
 	streamedChars: number;
 	lastDisplayAt: number;
 	displayText?: string;
+	displayParts?: ThroughputPart[];
+}
+
+export interface ThroughputPart {
+	key: string;
+	value: string;
 }
 
 export interface ThroughputUsage {
@@ -32,7 +38,11 @@ export function startAssistantStream(state: ThroughputState, now: number): void 
 	state.streamedChars = 0;
 	state.lastDisplayAt = 0;
 	state.requestStartedAt ??= now;
-	state.displayText = "TTFT: waiting · Decode: waiting";
+	state.displayParts = [
+		{ key: "TTFT", value: "waiting" },
+		{ key: "Decode", value: "waiting" },
+	];
+	state.displayText = partsToText(state.displayParts);
 }
 
 function positiveNumber(value: unknown): number | undefined {
@@ -60,6 +70,10 @@ function rate(value: number, durationSeconds: number): string {
 	return (value / Math.max(0.001, durationSeconds)).toFixed(1);
 }
 
+function partsToText(parts: ThroughputPart[]): string {
+	return parts.map((part) => `${part.key}: ${part.value}`).join(" · ");
+}
+
 export function recordThroughputDelta(state: ThroughputState, event: unknown, now: number): string | undefined {
 	const chars = deltaChars(event);
 	if (chars <= 0) return undefined;
@@ -76,9 +90,12 @@ export function recordThroughputDelta(state: ThroughputState, event: unknown, no
 
 	const decodeSeconds = seconds(now - state.firstOutputAt);
 	const estimatedTokens = state.streamedChars / CHARS_PER_TOKEN;
-	const text = `TTFT: ${state.ttftSeconds!.toFixed(2)}s · Decode: ~${rate(estimatedTokens, decodeSeconds)} tok/s · ~${Math.round(estimatedTokens)} tok`;
-	state.displayText = text;
-	return text;
+	state.displayParts = [
+		{ key: "TTFT", value: `${state.ttftSeconds!.toFixed(2)}s` },
+		{ key: "Decode", value: `~${rate(estimatedTokens, decodeSeconds)} tok/s · ~${Math.round(estimatedTokens)} tok` },
+	];
+	state.displayText = partsToText(state.displayParts);
+	return state.displayText;
 }
 
 export function finishAssistantStream(state: ThroughputState, usage?: ThroughputUsage): string {
@@ -90,32 +107,37 @@ export function finishAssistantStream(state: ThroughputState, usage?: Throughput
 			? seconds(state.lastOutputAt - state.firstOutputAt)
 			: undefined;
 
-	const parts: string[] = [];
+	const parts: ThroughputPart[] = [];
 	if (state.ttftSeconds !== undefined) {
-		parts.push(`TTFT: ${state.ttftSeconds.toFixed(2)}s`);
+		parts.push({ key: "TTFT", value: `${state.ttftSeconds.toFixed(2)}s` });
 	}
 
 	const processedInputTokens = (uncachedInputTokens ?? 0) + cacheWriteTokens;
 	if (processedInputTokens > 0 && state.ttftSeconds !== undefined && state.ttftSeconds > 0) {
-		parts.push(`Input/TTFT: ~${rate(processedInputTokens, state.ttftSeconds)} tok/s`);
+		parts.push({ key: "Input/TTFT", value: `~${rate(processedInputTokens, state.ttftSeconds)} tok/s` });
 	}
 
 	if (outputTokens !== undefined && outputTokens > 1 && decodeSeconds !== undefined && decodeSeconds > 0) {
-		parts.push(`Decode: ${rate(outputTokens - 1, decodeSeconds)} tok/s · ${outputTokens} tok`);
+		parts.push({ key: "Decode", value: `${rate(outputTokens - 1, decodeSeconds)} tok/s · ${outputTokens} tok` });
 	} else if (outputTokens !== undefined) {
-		parts.push(`Decode: ${outputTokens} tok · rate unavailable`);
+		parts.push({ key: "Decode", value: `${outputTokens} tok · rate unavailable` });
 	} else if (state.streamedChars > 0 && decodeSeconds !== undefined && decodeSeconds > 0) {
 		const estimatedTokens = state.streamedChars / CHARS_PER_TOKEN;
-		parts.push(`Decode: ~${rate(estimatedTokens, decodeSeconds)} tok/s · ~${Math.round(estimatedTokens)} tok`);
+		parts.push({ key: "Decode", value: `~${rate(estimatedTokens, decodeSeconds)} tok/s · ~${Math.round(estimatedTokens)} tok` });
 	} else {
-		parts.push("Decode: no output tokens");
+		parts.push({ key: "Decode", value: "no output tokens" });
 	}
 
-	state.displayText = parts.join(" · ");
+	state.displayParts = parts;
+	state.displayText = partsToText(parts);
 	state.requestStartedAt = undefined;
 	return state.displayText;
 }
 
 export function getThroughputText(state: ThroughputState): string | undefined {
 	return state.displayText;
+}
+
+export function getThroughputParts(state: ThroughputState): ThroughputPart[] | undefined {
+	return state.displayParts;
 }

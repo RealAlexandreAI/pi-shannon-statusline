@@ -3,6 +3,7 @@ import { strict as assert } from "node:assert";
 import {
 	createThroughputState,
 	finishAssistantStream,
+	getThroughputParts,
 	getThroughputText,
 	markProviderRequest,
 	recordThroughputDelta,
@@ -20,6 +21,10 @@ describe("throughput tracking", () => {
 			recordThroughputDelta(state, { type: "text_delta", delta: "hello" }, 1300),
 			"TTFT: 0.30s · Decode: ~1250.0 tok/s · ~1 tok",
 		);
+		assert.deepEqual(getThroughputParts(state), [
+			{ key: "TTFT", value: "0.30s" },
+			{ key: "Decode", value: "~1250.0 tok/s · ~1 tok" },
+		]);
 	});
 
 	it("counts thinking and tool-call deltas and throttles display updates", () => {

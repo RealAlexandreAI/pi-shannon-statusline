@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import {
   createThroughputState,
   finishAssistantStream,
-  getThroughputText,
+  getThroughputParts,
   markProviderRequest,
   recordThroughputDelta,
   startAssistantStream,
@@ -93,9 +93,10 @@ const I_PATH = "⌘";
 const I_BRANCH = "⎇";
 const I_CLOCK = "✦";
 const I_CTX = "⊡";
+const I_IN = "↑";
 const I_OUT = "↓";
 const I_CACHE = "⊗";
-const I_SPEED = "⚡";
+const I_SPEED = "»";
 const I_DONE = "✔";
 const I_RUN = "↻";
 const I_CLAUDE = "※";
@@ -237,18 +238,16 @@ function readContextUsage(ctx: any): ContextUsageSnapshot | null {
 // ═══════════════════════════════════════════════════════════════
 
 interface ShannonConfig {
-  /** Enable the left-side matrix rain column. Default: true */
   rain: boolean;
-  /** Character set for the rain. Default: katakana + digits + greek */
   rainChars: string;
-  /** Show Pi's built-in footer and extension statuses. Default: true */
   footer: boolean;
+  throughput: boolean;
 }
 
 const DEFAULT_RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
 
 function loadConfig(): ShannonConfig {
-  const cfg: ShannonConfig = { rain: true, rainChars: DEFAULT_RAIN_CHARS, footer: true };
+  const cfg: ShannonConfig = { rain: true, rainChars: DEFAULT_RAIN_CHARS, footer: true, throughput: true };
   try {
     const cfgPath = join(homedir(), ".pi", "agent", "shannon-statusline.json");
     if (existsSync(cfgPath)) {
@@ -256,6 +255,7 @@ function loadConfig(): ShannonConfig {
       if (typeof raw.rain === "boolean") cfg.rain = raw.rain;
       if (typeof raw.rainChars === "string" && raw.rainChars.length > 0) cfg.rainChars = raw.rainChars;
       if (typeof raw.footer === "boolean") cfg.footer = raw.footer;
+      if (typeof raw.throughput === "boolean") cfg.throughput = raw.throughput;
     }
   } catch { /* ignore - fall back to defaults */ }
   return cfg;
@@ -417,7 +417,7 @@ async function buildHud(ctx: any, config: ShannonConfig): Promise<string[]> {
   }
 
   if (contextUsage) {
-    parts1.push(`${c("ctx", CYAN)} ${c(fmtTokens(contextUsage.tokens), FG)}`);
+    parts1.push(`${c(I_IN, CYAN)} ${c(fmtTokens(contextUsage.tokens), FG)}`);
   }
 
   if (sessionStartTime > 0) {
@@ -428,7 +428,7 @@ async function buildHud(ctx: any, config: ShannonConfig): Promise<string[]> {
 
   lines.push(parts1.join(` ${sep} `));
 
-  // ── Line 2: Model + Context + Throughput ──
+  // ── Line 2: Model + Context ──
   const providerColor = COMMENT;
   let modelStr: string;
   if (modelProvider && modelId) {
@@ -457,17 +457,26 @@ async function buildHud(ctx: any, config: ShannonConfig): Promise<string[]> {
     line2Parts.push(ctxStr);
   }
 
-  const throughputText = getThroughputText(throughputState);
-  if (throughputText) line2Parts.push(`${c(I_SPEED, YELLOW)} ${c(throughputText, CYAN)}`);
   lines.push(line2Parts.join(` ${sep} `));
 
-  // ── Line 3: Config counts ──
+  // ── Line 3: Throughput ──
+  if (config.throughput) {
+    const throughputParts = getThroughputParts(throughputState);
+    if (throughputParts?.length) {
+      const throughputLine = throughputParts
+        .map(({ key, value }) => `${c(key, COMMENT)} ${c(value, FG)}`)
+        .join(` ${sep} `);
+      lines.push(`${c(I_SPEED, COMMENT)} ${throughputLine}`);
+    }
+  }
+
+  // ── Line 4: Config counts ──
   const configs = countConfigs(dir);
   const cfgParts: string[] = [];
-  if (configs.agentsMd > 0) cfgParts.push(`${c(I_CLAUDE, BLUE)} ${c(`×${configs.agentsMd}`, BLUE)} ${dim("AGENTS.md")}`);
-  if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, ORANGE)} ${c(`×${configs.mcps}`, ORANGE)} ${dim("MCPs")}`);
-  if (configs.skills > 0) cfgParts.push(`${c(I_SKILL, PURPLE)} ${c(`×${configs.skills}`, PURPLE)} ${dim("skills")}`);
-  if (configs.extensions > 0) cfgParts.push(`${c(I_EXT, YELLOW)} ${c(`×${configs.extensions}`, YELLOW)} ${dim("extensions")}`);
+  if (configs.agentsMd > 0) cfgParts.push(`${c(I_CLAUDE, BLUE)} ${c(`×${configs.agentsMd}`, FG)} ${dim("AGENTS.md")}`);
+  if (configs.mcps > 0) cfgParts.push(`${c(I_MCP, ORANGE)} ${c(`×${configs.mcps}`, FG)} ${dim("MCPs")}`);
+  if (configs.skills > 0) cfgParts.push(`${c(I_SKILL, PURPLE)} ${c(`×${configs.skills}`, FG)} ${dim("Skills")}`);
+  if (configs.extensions > 0) cfgParts.push(`${c(I_EXT, YELLOW)} ${c(`×${configs.extensions}`, FG)} ${dim("extensions")}`);
   if (cfgParts.length > 0) lines.push(cfgParts.join(` ${sep} `));
 
   // ── Separator + Tool counts ──

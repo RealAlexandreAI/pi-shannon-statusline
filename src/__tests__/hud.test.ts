@@ -129,8 +129,8 @@ function stripANSI(s: string): string {
 
 const DEFAULT_RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
 
-function loadConfig(homeDir: string): { rain: boolean; rainChars: string; footer: boolean } {
-  const cfg = { rain: true, rainChars: DEFAULT_RAIN_CHARS, footer: true };
+function loadConfig(homeDir: string): { rain: boolean; rainChars: string; footer: boolean; throughput: boolean } {
+  const cfg = { rain: true, rainChars: DEFAULT_RAIN_CHARS, footer: true, throughput: true };
   try {
     const cfgPath = join(homeDir, ".pi", "agent", "shannon-statusline.json");
     if (existsSync(cfgPath)) {
@@ -138,10 +138,12 @@ function loadConfig(homeDir: string): { rain: boolean; rainChars: string; footer
         rain: boolean;
         rainChars: string;
         footer: boolean;
+        throughput: boolean;
       }>;
       if (typeof raw.rain === "boolean") cfg.rain = raw.rain;
       if (typeof raw.rainChars === "string" && raw.rainChars.length > 0) cfg.rainChars = raw.rainChars;
       if (typeof raw.footer === "boolean") cfg.footer = raw.footer;
+      if (typeof raw.throughput === "boolean") cfg.throughput = raw.throughput;
     }
   } catch { /* ignore - fall back to defaults */ }
   return cfg;
@@ -160,6 +162,7 @@ describe("loadConfig", () => {
     assert.equal(cfg.rain, true);
     assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
     assert.equal(cfg.footer, true);
+    assert.equal(cfg.throughput, true);
     rmSync(home, { recursive: true, force: true });
   });
 
@@ -170,6 +173,7 @@ describe("loadConfig", () => {
     assert.equal(cfg.rain, false);
     assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS, "rainChars should stay default when not provided");
     assert.equal(cfg.footer, true, "footer should stay visible when not provided");
+    assert.equal(cfg.throughput, true, "throughput should stay visible when not provided");
     rmSync(home, { recursive: true, force: true });
   });
 
@@ -178,6 +182,16 @@ describe("loadConfig", () => {
     writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), JSON.stringify({ footer: false }));
     const cfg = loadConfig(home);
     assert.equal(cfg.footer, false);
+    assert.equal(cfg.rain, true, "rain should stay enabled when not provided");
+    assert.equal(cfg.throughput, true, "throughput should stay visible when not provided");
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("respects throughput: false", () => {
+    const home = makeTempHome();
+    writeFileSync(join(home, ".pi", "agent", "shannon-statusline.json"), JSON.stringify({ throughput: false }));
+    const cfg = loadConfig(home);
+    assert.equal(cfg.throughput, false);
     assert.equal(cfg.rain, true, "rain should stay enabled when not provided");
     rmSync(home, { recursive: true, force: true });
   });
@@ -206,6 +220,7 @@ describe("loadConfig", () => {
     assert.equal(cfg.rain, true);
     assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
     assert.equal(cfg.footer, true);
+    assert.equal(cfg.throughput, true);
     rmSync(home, { recursive: true, force: true });
   });
 
@@ -216,6 +231,7 @@ describe("loadConfig", () => {
     assert.equal(cfg.rain, true);
     assert.equal(cfg.rainChars, DEFAULT_RAIN_CHARS);
     assert.equal(cfg.footer, true);
+    assert.equal(cfg.throughput, true);
     rmSync(home, { recursive: true, force: true });
   });
 });
