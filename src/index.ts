@@ -8,6 +8,14 @@ import { promisify } from "node:util";
 import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import {
+  createThroughputState,
+  finishAssistantStream,
+  getThroughputText,
+  markProviderRequest,
+  recordThroughputDelta,
+  startAssistantStream,
+} from "./throughput.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,6 +60,11 @@ let modelProvider = "";
 let modelId = "";
 let cwd = "";
 let waitingPrompt: { kind: string; title?: string } | null = null;
+let throughputState = createThroughputState();
+let hudRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let hudRefreshContext: any;
+let hudRenderSequence = 0;
+let footerVisible = true;
 
 // ═══════════════════════════════════════════════════════════════
 // ANSI palette
@@ -80,9 +93,9 @@ const I_PATH = "⌘";
 const I_BRANCH = "⎇";
 const I_CLOCK = "✦";
 const I_CTX = "⊡";
-const I_IN = "↑";
 const I_OUT = "↓";
 const I_CACHE = "⊗";
+const I_SPEED = "⚡";
 const I_DONE = "✔";
 const I_RUN = "↻";
 const I_CLAUDE = "※";
@@ -199,6 +212,26 @@ function fmtDuration(ms: number): string {
   return `${h}h ${m % 60}m`;
 }
 
+interface ContextUsageSnapshot {
+  percent: number;
+  contextWindow: number;
+  tokens: number;
+}
+
+function readContextUsage(ctx: any): ContextUsageSnapshot | null {
+  try {
+    const usage = ctx.getContextUsage?.();
+    if (!usage) return null;
+    return {
+      percent: usage.percent ?? 0,
+      contextWindow: usage.contextWindow ?? 0,
+      tokens: usage.tokens ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // User config (~/.pi/agent/shannon-statusline.json)
 // ═══════════════════════════════════════════════════════════════
@@ -208,21 +241,39 @@ interface ShannonConfig {
   rain: boolean;
   /** Character set for the rain. Default: katakana + digits + greek */
   rainChars: string;
+  /** Show Pi's built-in footer and extension statuses. Default: true */
+  footer: boolean;
 }
 
 const DEFAULT_RAIN_CHARS = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789λΨΩΔΦ";
 
 function loadConfig(): ShannonConfig {
-  const cfg: ShannonConfig = { rain: true, rainChars: DEFAULT_RAIN_CHARS };
+  const cfg: ShannonConfig = { rain: true, rainChars: DEFAULT_RAIN_CHARS, footer: true };
   try {
     const cfgPath = join(homedir(), ".pi", "agent", "shannon-statusline.json");
     if (existsSync(cfgPath)) {
       const raw = JSON.parse(readFileSync(cfgPath, "utf8")) as Partial<ShannonConfig>;
       if (typeof raw.rain === "boolean") cfg.rain = raw.rain;
       if (typeof raw.rainChars === "string" && raw.rainChars.length > 0) cfg.rainChars = raw.rainChars;
+      if (typeof raw.footer === "boolean") cfg.footer = raw.footer;
     }
   } catch { /* ignore - fall back to defaults */ }
   return cfg;
+}
+
+function syncFooter(ctx: any, showFooter: boolean): void {
+  if (footerVisible === showFooter) return;
+
+  if (showFooter) {
+    ctx.ui.setFooter(undefined);
+  } else {
+    ctx.ui.setFooter(() => ({
+      render(_width: number): string[] { return []; },
+      invalidate() {},
+    }));
+  }
+
+  footerVisible = showFooter;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -336,13 +387,13 @@ function countConfigs(dir: string) {
 // HUD Renderer
 // ═══════════════════════════════════════════════════════════════
 
-async function buildHud(ctx: any): Promise<string[]> {
+async function buildHud(ctx: any, config: ShannonConfig): Promise<string[]> {
   const lines: string[] = [];
   const dir = cwd;
   const sep = `${COMMENT}│${R}`;
-  const config = loadConfig();
+  const contextUsage = readContextUsage(ctx);
 
-  // ── Line 1: Project + Git + Duration ──
+  // ── Line 1: Project + Git + Context tokens + Duration ──
   const parts1: string[] = [];
   if (dir) {
     const home = homedir();
@@ -365,6 +416,10 @@ async function buildHud(ctx: any): Promise<string[]> {
     parts1.push(gitStr);
   }
 
+  if (contextUsage) {
+    parts1.push(`${c("ctx", CYAN)} ${c(fmtTokens(contextUsage.tokens), FG)}`);
+  }
+
   if (sessionStartTime > 0) {
     // Turn count before duration
     if (turnIndex > 0) parts1.push(`${c(`↺ loop`, PURPLE)} ${c(`×${turnIndex}`, FG)}`);
@@ -373,7 +428,7 @@ async function buildHud(ctx: any): Promise<string[]> {
 
   lines.push(parts1.join(` ${sep} `));
 
-  // ── Line 2: Model (provider/id) + Thinking level + Context + Tokens ──
+  // ── Line 2: Model + Context + Throughput ──
   const providerColor = COMMENT;
   let modelStr: string;
   if (modelProvider && modelId) {
@@ -389,26 +444,22 @@ async function buildHud(ctx: any): Promise<string[]> {
   // Thinking level removed — Pi doesn't expose real-time value in event context
   // (getThinkingLevel() only on command ctx, ctx.model has no current level)
 
-  let ctxStr = "";
-  try {
-    const usage = ctx.getContextUsage?.();
-    if (usage) {
-      const pct = usage.percent ?? 0;
-      const bar = ctxBar(pct, 10);
-      const win = usage.contextWindow ?? 0;
-      const winLabel = win >= 1_000_000 ? `${(win / 1_000_000).toFixed(1)}M` : win >= 1000 ? `${Math.round(win / 1000)}k` : "";
-      ctxStr = `${c(I_CTX, CYAN)} ${bar} ${c(`${pct.toFixed(1)}%`, ctxPctColor(pct))}`;
-      if (winLabel) ctxStr += ` ${dim(`(${winLabel})`)}`;
+  const line2Parts = [modelStr];
+  if (contextUsage) {
+    const bar = ctxBar(contextUsage.percent, 10);
+    const winLabel = contextUsage.contextWindow >= 1_000_000
+      ? `${(contextUsage.contextWindow / 1_000_000).toFixed(1)}M`
+      : contextUsage.contextWindow >= 1000
+        ? `${Math.round(contextUsage.contextWindow / 1000)}k`
+        : "";
+    let ctxStr = `${c(I_CTX, CYAN)} ${bar} ${c(`${contextUsage.percent.toFixed(1)}%`, ctxPctColor(contextUsage.percent))}`;
+    if (winLabel) ctxStr += ` ${dim(`(${winLabel})`)}`;
+    line2Parts.push(ctxStr);
+  }
 
-      const totalTokens = usage.tokens ?? 0;
-      let tokStr = `${c(I_IN, CYAN)} ${c(fmtTokens(totalTokens), FG)}`;
-
-      const line2 = `${modelStr} ${sep} ${ctxStr} ${sep} ${tokStr}`;
-      lines.push(line2);
-    } else {
-      lines.push(modelStr);
-    }
-  } catch { lines.push(modelStr); }
+  const throughputText = getThroughputText(throughputState);
+  if (throughputText) line2Parts.push(`${c(I_SPEED, YELLOW)} ${c(throughputText, CYAN)}`);
+  lines.push(line2Parts.join(` ${sep} `));
 
   // ── Line 3: Config counts ──
   const configs = countConfigs(dir);
@@ -472,10 +523,32 @@ async function buildHud(ctx: any): Promise<string[]> {
 // HUD refresh
 // ═══════════════════════════════════════════════════════════════
 
+const HUD_STREAM_REFRESH_MS = 200;
+
 function refreshHud(ctx: any) {
-  buildHud(ctx).then(lines => {
+  if (hudRefreshTimer) {
+    clearTimeout(hudRefreshTimer);
+    hudRefreshTimer = undefined;
+  }
+  hudRefreshContext = undefined;
+  const sequence = ++hudRenderSequence;
+  const config = loadConfig();
+  syncFooter(ctx, config.footer);
+  buildHud(ctx, config).then(lines => {
+    if (sequence !== hudRenderSequence) return;
     if (lines.length > 0) ctx.ui.setWidget("shannon-hud", lines, { placement: "belowEditor" });
   }).catch(() => {});
+}
+
+function refreshHudThrottled(ctx: any) {
+  hudRefreshContext = ctx;
+  if (hudRefreshTimer) return;
+  hudRefreshTimer = setTimeout(() => {
+    hudRefreshTimer = undefined;
+    const pendingContext = hudRefreshContext;
+    hudRefreshContext = undefined;
+    if (pendingContext) refreshHud(pendingContext);
+  }, HUD_STREAM_REFRESH_MS);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -492,6 +565,9 @@ export default function (pi: ExtensionAPI) {
     cwd = ctx.cwd;
     tools = [];
     waitingPrompt = null;
+    throughputState = createThroughputState();
+    // Pi resets extension UI before a new session starts.
+    footerVisible = true;
     if (ctx.model) {
       modelProvider = (ctx.model as any).provider ?? "";
       modelId = (ctx.model as any).id ?? "";
@@ -504,6 +580,29 @@ export default function (pi: ExtensionAPI) {
       modelProvider = (event.model as any).provider ?? "";
       modelId = (event.model as any).id ?? "";
     }
+    throughputState = createThroughputState();
+    refreshHud(ctx);
+  });
+
+  pi.on("before_provider_request", () => {
+    markProviderRequest(throughputState, Date.now());
+  });
+
+  pi.on("message_start", (event, ctx) => {
+    if (event.message.role !== "assistant") return;
+    startAssistantStream(throughputState, Date.now());
+    refreshHud(ctx);
+  });
+
+  pi.on("message_update", (event, ctx) => {
+    if (event.message.role !== "assistant") return;
+    const text = recordThroughputDelta(throughputState, event.assistantMessageEvent, Date.now());
+    if (text !== undefined) refreshHudThrottled(ctx);
+  });
+
+  pi.on("message_end", (event, ctx) => {
+    if (event.message.role !== "assistant") return;
+    finishAssistantStream(throughputState, event.message.usage);
     refreshHud(ctx);
   });
 

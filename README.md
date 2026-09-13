@@ -17,8 +17,8 @@ Ported from [shannon-statusline](https://github.com/RealAlexandreAI/shannon-stat
 A live cyberpunk HUD rendered below every Pi response:
 
 ```
-⌘ ~/D/project  │  ⎇ main* ↑2 !3 +1  │  ↺ loop ×12  │  ✦ 12m
-↑ deepseek / deepseek-v4-pro  │  ⊡ ████████░░░░ 65% (200k)  │  ↑ 36k
+⌘ ~/D/project  │  ⎇ main* ↑2 !3 +1  │  ↺ loop ×12  │  ctx 36k  │  ✦ 12m
+λ deepseek / deepseek-v4-pro  │  ⊡ ████████░░░░ 65% (200k)  │  ⚡ TTFT 1.24s · ↓ ~42.1 tok/s · ~312 tok
 ※ ×3 AGENTS.md  │  ⊕ ×4 MCPs  │  ×5 skills
 ─────────────────────────────────────────────────────────────
 ✔ read ×12  │  ✔ edit ×7  │  ✔ bash ×4
@@ -48,12 +48,13 @@ cd pi-shannon-statusline && pi install .
 
 ## Configuration
 
-Optional. Defaults work with zero config, but you can customize the matrix rain via `~/.pi/agent/shannon-statusline.json`:
+Optional. Defaults work with zero config. Customize the matrix rain and Pi footer via `~/.pi/agent/shannon-statusline.json`:
 
 ```json
 {
   "rain": false,
-  "rainChars": "0123456789λΨΩΔΦABCDEFGH"
+  "rainChars": "0123456789λΨΩΔΦABCDEFGH",
+  "footer": false
 }
 ```
 
@@ -61,8 +62,11 @@ Optional. Defaults work with zero config, but you can customize the matrix rain 
 |---|---|---|---|
 | `rain` | boolean | `true` | Enable the left-side matrix rain column |
 | `rainChars` | string | katakana + digits + greek | Character set picked at random for the rain |
+| `footer` | boolean | `true` | Show Pi's footer; `false` hides the built-in footer and all extension status rows |
 
 > **Font note:** the default rain uses half-width katakana (`ｦｧｨｩ…`) which require a CJK-capable font. If you see tofu boxes (乱码), either install a CJK font (e.g. [Sarasa Mono](https://github.com/be5invis/Sarasa-Gothic)), set `rainChars` to characters your font supports, or set `"rain": false`.
+
+Set `"footer": false` to hide the entire Pi footer, including the built-in directory/token/model rows and statuses contributed through `ctx.ui.setStatus()`. The Shannon HUD below the editor is unaffected. Set it back to `true` to restore Pi's built-in footer.
 
 Config is re-read on every HUD refresh, so changes take effect on the next refresh — no `/reload` needed.
 
@@ -72,12 +76,13 @@ Config is re-read on every HUD refresh, so changes take effect on the next refre
 |---|---|
 | **Project + Git** | CWD (fish-style abbreviation), branch, dirty, ahead/behind, file changes |
 | **Turn count** | `↺ loop ×N` between git and duration |
-| **Model + Context** | Provider / model name, context bar with percentage, token count |
+| **Model + Context + Throughput** | Provider / model name, context bar, current context tokens, TTFT, and decode rate |
 | **Config counts** | AGENTS.md ×N, rules ×N, MCPs ×N, skills ×N |
 | **Tool activity** | Completed tool counts, running tools with elapsed time |
 | **Agent activity** | Running agent timer, completed agent count |
 | **Waiting for user** | `⧗ waiting for user (select) "…"` while a blocking extension UI prompt is open (pi ≥ 0.84.4) |
 | **Matrix rain** | 6-column animated katakana rain (configurable) |
+| **Footer control** | Optional switch for Pi's built-in footer and extension status rows |
 
 ## Pi-native advantages
 
@@ -87,12 +92,19 @@ Config is re-read on every HUD refresh, so changes take effect on the next refre
 - **Model auto-detection** — updates on `model_select` event
 - **Tool/agent tracking** — hooks `tool_call`, `tool_result`, `agent_start`, `agent_end`
 - **Waiting-on-user detection** — hooks `ui_prompt_start` / `ui_prompt_end` (requires Pi ≥ 0.84.4; silently inactive on older versions)
-- **Zero config by default** - install and go, optional JSON for the rain
+- **Live throughput** — renders client-side TTFT and decode rate in the second HUD line, using final provider usage when available
+- **Zero config by default** - install and go, optional JSON for rain and footer visibility
+
+### Throughput semantics
+
+`TTFT` is measured from Pi's `before_provider_request` hook to the first assistant delta. The live decode rate uses a `characters / 4` estimate, so it is approximate and varies by prose, code, JSON, and CJK. After the response ends, the HUD uses `message_end` usage for the output-token count and the client-observed first-to-last delta interval.
+
+`Input/TTFT` is a client-side prompt-rate estimate. It includes request and network overhead and is not server-side prefill throughput. Providers that buffer output or do not report final usage can only show the approximate fallback.
 
 ## Testing
 
 ```bash
-node --test src/__tests__/hud.test.ts
+node --test src/__tests__/*.ts
 ```
 
 ## License
