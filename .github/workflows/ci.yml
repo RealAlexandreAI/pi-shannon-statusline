@@ -24,4 +24,4 @@ jobs:
       - name: Compile
         run: |
           npm install --no-save typescript @types/node
-          npx --no-install tsc --noEmit --skipLibCheck --esModuleInterop --module nodenext --moduleResolution nodenext --target es2022 src/index.ts
+          npx --no-install tsc --noEmit --skipLibCheck --allowImportingTsExtensions --esModuleInterop --module nodenext --moduleResolution nodenext --target es2022 src/index.ts
